@@ -22,91 +22,123 @@ Partial Class UndeleteForm
     'Do not modify it using the code editor.
     <System.Diagnostics.DebuggerStepThrough()> _
     Private Sub InitializeComponent()
-        Me.FlowLayoutPanel2 = New System.Windows.Forms.FlowLayoutPanel()
-        Me.BtnUpdate = New System.Windows.Forms.Button()
+        Dim PanelBottom As System.Windows.Forms.FlowLayoutPanel
+        Dim PanelMain As System.Windows.Forms.Panel
         Me.BtnCancel = New System.Windows.Forms.Button()
-        Me.Label1 = New System.Windows.Forms.Label()
-        Me.TextBox1 = New System.Windows.Forms.TextBox()
+        Me.BtnUpdate = New System.Windows.Forms.Button()
+        Me.FlowLayoutPanelMain = New System.Windows.Forms.FlowLayoutPanel()
+        Me.LabelCaption = New System.Windows.Forms.Label()
         Me.LabelFileName = New System.Windows.Forms.Label()
-        Me.FlowLayoutPanel2.SuspendLayout()
+        Me.TextBoxChar = New System.Windows.Forms.TextBox()
+        PanelBottom = New System.Windows.Forms.FlowLayoutPanel()
+        PanelMain = New System.Windows.Forms.Panel()
+        PanelBottom.SuspendLayout()
+        PanelMain.SuspendLayout()
+        Me.FlowLayoutPanelMain.SuspendLayout()
         Me.SuspendLayout()
         '
-        'FlowLayoutPanel2
+        'PanelBottom
         '
-        Me.FlowLayoutPanel2.Anchor = System.Windows.Forms.AnchorStyles.Bottom
-        Me.FlowLayoutPanel2.AutoSize = True
-        Me.FlowLayoutPanel2.AutoSizeMode = System.Windows.Forms.AutoSizeMode.GrowAndShrink
-        Me.FlowLayoutPanel2.Controls.Add(Me.BtnUpdate)
-        Me.FlowLayoutPanel2.Controls.Add(Me.BtnCancel)
-        Me.FlowLayoutPanel2.Location = New System.Drawing.Point(74, 70)
-        Me.FlowLayoutPanel2.Margin = New System.Windows.Forms.Padding(3, 3, 3, 0)
-        Me.FlowLayoutPanel2.Name = "FlowLayoutPanel2"
-        Me.FlowLayoutPanel2.Size = New System.Drawing.Size(192, 29)
-        Me.FlowLayoutPanel2.TabIndex = 2
-        '
-        'BtnUpdate
-        '
-        Me.BtnUpdate.AutoSizeMode = System.Windows.Forms.AutoSizeMode.GrowAndShrink
-        Me.BtnUpdate.DialogResult = System.Windows.Forms.DialogResult.OK
-        Me.BtnUpdate.Location = New System.Drawing.Point(3, 3)
-        Me.BtnUpdate.Name = "BtnUpdate"
-        Me.BtnUpdate.Size = New System.Drawing.Size(90, 23)
-        Me.BtnUpdate.TabIndex = 0
-        Me.BtnUpdate.Text = "&Update"
-        Me.BtnUpdate.UseVisualStyleBackColor = True
+        PanelBottom.BackColor = System.Drawing.SystemColors.Control
+        PanelBottom.Controls.Add(Me.BtnCancel)
+        PanelBottom.Controls.Add(Me.BtnUpdate)
+        PanelBottom.Dock = System.Windows.Forms.DockStyle.Bottom
+        PanelBottom.FlowDirection = System.Windows.Forms.FlowDirection.RightToLeft
+        PanelBottom.Location = New System.Drawing.Point(0, 47)
+        PanelBottom.Name = "PanelBottom"
+        PanelBottom.Padding = New System.Windows.Forms.Padding(6, 10, 6, 10)
+        PanelBottom.Size = New System.Drawing.Size(350, 43)
+        PanelBottom.TabIndex = 1
+        PanelBottom.WrapContents = False
         '
         'BtnCancel
         '
-        Me.BtnCancel.AutoSizeMode = System.Windows.Forms.AutoSizeMode.GrowAndShrink
         Me.BtnCancel.DialogResult = System.Windows.Forms.DialogResult.Cancel
-        Me.BtnCancel.Location = New System.Drawing.Point(99, 3)
+        Me.BtnCancel.Location = New System.Drawing.Point(257, 10)
+        Me.BtnCancel.Margin = New System.Windows.Forms.Padding(6, 0, 6, 0)
         Me.BtnCancel.Name = "BtnCancel"
-        Me.BtnCancel.Size = New System.Drawing.Size(90, 23)
+        Me.BtnCancel.Size = New System.Drawing.Size(75, 23)
         Me.BtnCancel.TabIndex = 1
-        Me.BtnCancel.Text = "&Cancel"
+        Me.BtnCancel.Text = "{&Cancel}"
         Me.BtnCancel.UseVisualStyleBackColor = True
         '
-        'Label1
+        'BtnUpdate
         '
-        Me.Label1.AutoSize = True
-        Me.Label1.Location = New System.Drawing.Point(12, 28)
-        Me.Label1.Name = "Label1"
-        Me.Label1.Size = New System.Drawing.Size(132, 13)
-        Me.Label1.TabIndex = 0
-        Me.Label1.Text = "Enter the first character for"
-        Me.Label1.UseMnemonic = False
+        Me.BtnUpdate.DialogResult = System.Windows.Forms.DialogResult.OK
+        Me.BtnUpdate.Location = New System.Drawing.Point(170, 10)
+        Me.BtnUpdate.Margin = New System.Windows.Forms.Padding(6, 0, 6, 0)
+        Me.BtnUpdate.Name = "BtnUpdate"
+        Me.BtnUpdate.Size = New System.Drawing.Size(75, 23)
+        Me.BtnUpdate.TabIndex = 0
+        Me.BtnUpdate.Text = "{&Update}"
+        Me.BtnUpdate.UseVisualStyleBackColor = True
         '
-        'TextBox1
+        'PanelMain
         '
-        Me.TextBox1.CharacterCasing = System.Windows.Forms.CharacterCasing.Upper
-        Me.TextBox1.Location = New System.Drawing.Point(280, 25)
-        Me.TextBox1.MaxLength = 1
-        Me.TextBox1.Name = "TextBox1"
-        Me.TextBox1.ShortcutsEnabled = False
-        Me.TextBox1.Size = New System.Drawing.Size(43, 20)
-        Me.TextBox1.TabIndex = 1
+        PanelMain.AutoSize = True
+        PanelMain.AutoSizeMode = System.Windows.Forms.AutoSizeMode.GrowAndShrink
+        PanelMain.BackColor = System.Drawing.SystemColors.Window
+        PanelMain.Controls.Add(Me.FlowLayoutPanelMain)
+        PanelMain.Controls.Add(Me.TextBoxChar)
+        PanelMain.Dock = System.Windows.Forms.DockStyle.Fill
+        PanelMain.Location = New System.Drawing.Point(0, 0)
+        PanelMain.Name = "PanelMain"
+        PanelMain.Padding = New System.Windows.Forms.Padding(18, 18, 18, 6)
+        PanelMain.Size = New System.Drawing.Size(350, 47)
+        PanelMain.TabIndex = 0
+        '
+        'FlowLayoutPanelMain
+        '
+        Me.FlowLayoutPanelMain.Controls.Add(Me.LabelCaption)
+        Me.FlowLayoutPanelMain.Controls.Add(Me.LabelFileName)
+        Me.FlowLayoutPanelMain.Location = New System.Drawing.Point(18, 18)
+        Me.FlowLayoutPanelMain.Name = "FlowLayoutPanelMain"
+        Me.FlowLayoutPanelMain.Size = New System.Drawing.Size(262, 20)
+        Me.FlowLayoutPanelMain.TabIndex = 0
+        Me.FlowLayoutPanelMain.WrapContents = False
+        '
+        'LabelCaption
+        '
+        Me.LabelCaption.AutoSize = True
+        Me.LabelCaption.Location = New System.Drawing.Point(0, 3)
+        Me.LabelCaption.Margin = New System.Windows.Forms.Padding(0, 3, 3, 0)
+        Me.LabelCaption.Name = "LabelCaption"
+        Me.LabelCaption.Size = New System.Drawing.Size(51, 13)
+        Me.LabelCaption.TabIndex = 0
+        Me.LabelCaption.Text = "{Caption}"
+        Me.LabelCaption.UseMnemonic = False
         '
         'LabelFileName
         '
         Me.LabelFileName.AutoSize = True
         Me.LabelFileName.ForeColor = System.Drawing.Color.Blue
-        Me.LabelFileName.Location = New System.Drawing.Point(147, 28)
+        Me.LabelFileName.Location = New System.Drawing.Point(54, 3)
+        Me.LabelFileName.Margin = New System.Windows.Forms.Padding(0, 3, 3, 0)
         Me.LabelFileName.Name = "LabelFileName"
-        Me.LabelFileName.Size = New System.Drawing.Size(60, 13)
-        Me.LabelFileName.TabIndex = 3
-        Me.LabelFileName.Text = "FILENAME"
+        Me.LabelFileName.Size = New System.Drawing.Size(59, 13)
+        Me.LabelFileName.TabIndex = 1
+        Me.LabelFileName.Text = "{FileName}"
         Me.LabelFileName.UseMnemonic = False
+        '
+        'TextBoxChar
+        '
+        Me.TextBoxChar.CharacterCasing = System.Windows.Forms.CharacterCasing.Upper
+        Me.TextBoxChar.Location = New System.Drawing.Point(286, 18)
+        Me.TextBoxChar.MaxLength = 1
+        Me.TextBoxChar.Name = "TextBoxChar"
+        Me.TextBoxChar.ShortcutsEnabled = False
+        Me.TextBoxChar.Size = New System.Drawing.Size(43, 20)
+        Me.TextBoxChar.TabIndex = 1
         '
         'UndeleteForm
         '
         Me.AutoScaleDimensions = New System.Drawing.SizeF(6.0!, 13.0!)
         Me.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font
+        Me.BackColor = System.Drawing.SystemColors.Control
         Me.CancelButton = Me.BtnCancel
-        Me.ClientSize = New System.Drawing.Size(340, 108)
-        Me.Controls.Add(Me.LabelFileName)
-        Me.Controls.Add(Me.TextBox1)
-        Me.Controls.Add(Me.Label1)
-        Me.Controls.Add(Me.FlowLayoutPanel2)
+        Me.ClientSize = New System.Drawing.Size(350, 90)
+        Me.Controls.Add(PanelMain)
+        Me.Controls.Add(PanelBottom)
         Me.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedDialog
         Me.MaximizeBox = False
         Me.MinimizeBox = False
@@ -114,17 +146,19 @@ Partial Class UndeleteForm
         Me.ShowIcon = False
         Me.ShowInTaskbar = False
         Me.StartPosition = System.Windows.Forms.FormStartPosition.CenterParent
-        Me.Text = "Undelete File"
-        Me.FlowLayoutPanel2.ResumeLayout(False)
+        PanelBottom.ResumeLayout(False)
+        PanelMain.ResumeLayout(False)
+        PanelMain.PerformLayout()
+        Me.FlowLayoutPanelMain.ResumeLayout(False)
+        Me.FlowLayoutPanelMain.PerformLayout()
         Me.ResumeLayout(False)
         Me.PerformLayout()
 
     End Sub
-
-    Friend WithEvents FlowLayoutPanel2 As FlowLayoutPanel
     Friend WithEvents BtnUpdate As Button
     Friend WithEvents BtnCancel As Button
-    Friend WithEvents Label1 As Label
-    Friend WithEvents TextBox1 As TextBox
+    Friend WithEvents TextBoxChar As TextBox
+    Friend WithEvents FlowLayoutPanelMain As FlowLayoutPanel
+    Friend WithEvents LabelCaption As Label
     Friend WithEvents LabelFileName As Label
 End Class

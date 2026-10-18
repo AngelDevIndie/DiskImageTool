@@ -15,7 +15,7 @@ Option Explicit On
 Namespace My
     
     <Global.System.Runtime.CompilerServices.CompilerGeneratedAttribute(),  _
-     Global.System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.VisualStudio.Editors.SettingsDesigner.SettingsSingleFileGenerator", "17.11.0.0"),  _
+     Global.System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.VisualStudio.Editors.SettingsDesigner.SettingsSingleFileGenerator", "18.4.0.0"),  _
      Global.System.ComponentModel.EditorBrowsableAttribute(Global.System.ComponentModel.EditorBrowsableState.Advanced)>  _
     Partial Friend NotInheritable Class MySettings
         Inherits Global.System.Configuration.ApplicationSettingsBase
@@ -54,100 +54,13 @@ Namespace My
             End Get
         End Property
         
-        <Global.System.Configuration.UserScopedSettingAttribute(),  _
+        <Global.System.Configuration.ApplicationScopedSettingAttribute(),  _
          Global.System.Diagnostics.DebuggerNonUserCodeAttribute(),  _
-         Global.System.Configuration.DefaultSettingValueAttribute("0")>  _
-        Public Property WindowWidth() As Integer
+         Global.System.Configuration.DefaultSettingValueAttribute("https://www.mobygames.com/")>  _
+        Public ReadOnly Property MobyGamesURL() As String
             Get
-                Return CType(Me("WindowWidth"),Integer)
+                Return CType(Me("MobyGamesURL"),String)
             End Get
-            Set
-                Me("WindowWidth") = value
-            End Set
-        End Property
-        
-        <Global.System.Configuration.UserScopedSettingAttribute(),  _
-         Global.System.Diagnostics.DebuggerNonUserCodeAttribute(),  _
-         Global.System.Configuration.DefaultSettingValueAttribute("0")>  _
-        Public Property WindowHeight() As Integer
-            Get
-                Return CType(Me("WindowHeight"),Integer)
-            End Get
-            Set
-                Me("WindowHeight") = value
-            End Set
-        End Property
-        
-        <Global.System.Configuration.UserScopedSettingAttribute(),  _
-         Global.System.Diagnostics.DebuggerNonUserCodeAttribute(),  _
-         Global.System.Configuration.DefaultSettingValueAttribute("True")>  _
-        Public Property CreateBackups() As Boolean
-            Get
-                Return CType(Me("CreateBackups"),Boolean)
-            End Get
-            Set
-                Me("CreateBackups") = value
-            End Set
-        End Property
-        
-        <Global.System.Configuration.UserScopedSettingAttribute(),  _
-         Global.System.Diagnostics.DebuggerNonUserCodeAttribute(),  _
-         Global.System.Configuration.DefaultSettingValueAttribute("False")>  _
-        Public Property Debug() As Boolean
-            Get
-                Return CType(Me("Debug"),Boolean)
-            End Get
-            Set
-                Me("Debug") = value
-            End Set
-        End Property
-        
-        <Global.System.Configuration.UserScopedSettingAttribute(),  _
-         Global.System.Diagnostics.DebuggerNonUserCodeAttribute(),  _
-         Global.System.Configuration.DefaultSettingValueAttribute("True")>  _
-        Public Property DragAndDrop() As Boolean
-            Get
-                Return CType(Me("DragAndDrop"),Boolean)
-            End Get
-            Set
-                Me("DragAndDrop") = value
-            End Set
-        End Property
-        
-        <Global.System.Configuration.UserScopedSettingAttribute(),  _
-         Global.System.Diagnostics.DebuggerNonUserCodeAttribute(),  _
-         Global.System.Configuration.DefaultSettingValueAttribute("")>  _
-        Public Property ChangeLogETag() As String
-            Get
-                Return CType(Me("ChangeLogETag"),String)
-            End Get
-            Set
-                Me("ChangeLogETag") = value
-            End Set
-        End Property
-        
-        <Global.System.Configuration.UserScopedSettingAttribute(),  _
-         Global.System.Diagnostics.DebuggerNonUserCodeAttribute(),  _
-         Global.System.Configuration.DefaultSettingValueAttribute("")>  _
-        Public Property AppUpdateETag() As String
-            Get
-                Return CType(Me("AppUpdateETag"),String)
-            End Get
-            Set
-                Me("AppUpdateETag") = value
-            End Set
-        End Property
-        
-        <Global.System.Configuration.UserScopedSettingAttribute(),  _
-         Global.System.Diagnostics.DebuggerNonUserCodeAttribute(),  _
-         Global.System.Configuration.DefaultSettingValueAttribute("True")>  _
-        Public Property CheckUpdateOnStartup() As Boolean
-            Get
-                Return CType(Me("CheckUpdateOnStartup"),Boolean)
-            End Get
-            Set
-                Me("CheckUpdateOnStartup") = value
-            End Set
         End Property
     End Class
 End Namespace

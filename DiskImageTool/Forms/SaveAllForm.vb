@@ -19,6 +19,8 @@ Public Class SaveAllForm
         InitializeComponent()
 
         ' Add any initialization after the InitializeComponent() call.
+        LocalizeForm()
+
         LblCaption.Text = Caption
     End Sub
 
@@ -31,6 +33,22 @@ Public Class SaveAllForm
         End Set
     End Property
 
+    Public Shared Function Display(Caption As String) As MyMsgBoxResult
+        Using dlg As New SaveAllForm(Caption)
+            dlg.ShowDialog(App.CurrentFormInstance)
+
+            Return dlg.Result
+        End Using
+    End Function
+
+    Private Sub LocalizeForm()
+        BtnCancel.Text = My.Resources.Menu_Cancel
+        BtnNo.Text = My.Resources.Menu_No
+        BtnYes.Text = My.Resources.Menu_Yes
+        Me.Text = WithoutHotkey(My.Resources.Menu_Save)
+        BtnNoToall.Text = My.Resources.Menu_NoToAll
+        BtnYesToAll.Text = My.Resources.Menu_YesToAll
+    End Sub
 #Region "Events"
 
     Private Sub Button_Click(sender As Object, e As EventArgs) Handles BtnYes.Click, BtnNo.Click, BtnCancel.Click, BtnYesToAll.Click, BtnNoToall.Click

@@ -37,7 +37,7 @@
         End Property
         Public Overrides ReadOnly Property SectorChain As List(Of UInteger) Implements IDirectory.SectorChain
             Get
-                Dim Chain = New List(Of UInteger)
+                Dim Chain As New List(Of UInteger)
 
                 For Sector = Disk.BPB.RootDirectoryRegionStart To Disk.BPB.DataRegionStart - 1
                     Chain.Add(Sector)
@@ -47,13 +47,13 @@
             End Get
         End Property
 
-        Public Overrides Function AddDirectory(DirectoryData() As Byte, Options As AddFileOptions, LFNFileName As String, Optional Index As Integer = -1) As AddDirectoryData Implements IDirectory.AddDirectory
-            Dim Data = InitializeAddDirectory(Me, Options, LFNFileName, Index)
+        Public Overrides Function AddDirectory(EntryData() As Byte, Options As AddFileOptions, Filename As String, Optional Index As Integer = -1) As AddFileData Implements IDirectory.AddDirectory
+            Dim Data = InitializeAddDirectory(Me, Options, Index, Filename)
 
             If Data.ClusterList IsNot Nothing Then
                 Dim UseTransaction As Boolean = Disk.BeginTransaction
 
-                Data.Entry = ProcessAddDirectory(Me, DirectoryData, Data)
+                ProcessAddDirectory(Me, Data, EntryData)
 
                 If UseTransaction Then
                     Disk.EndTransaction()
@@ -71,7 +71,7 @@
                 Return -1
             End If
 
-            Dim Data = InitializeAddFile(Me, FileInfo, Options, Index)
+            Dim Data = InitializeAddFile(Me, Options, Index, FileInfo)
 
             If Data.ClusterList Is Nothing Then
                 Return -1
@@ -91,8 +91,8 @@
         Public Overrides Function GetContent() As Byte() Implements IDirectory.GetContent
             Dim SectorStart = Disk.BPB.RootDirectoryRegionStart
             Dim SectorEnd = Disk.BPB.DataRegionStart
-            Dim Length = Disk.SectorToBytes(SectorEnd - SectorStart)
-            Dim Offset = Disk.SectorToBytes(SectorStart)
+            Dim Length = Disk.BPB.SectorToBytes(SectorEnd - SectorStart)
+            Dim Offset = Disk.BPB.SectorToBytes(SectorStart)
 
             Return Disk.Image.GetBytes(Offset, Length)
         End Function
@@ -205,8 +205,8 @@
         End Function
 
         Private Sub InitializeDirectoryData()
-            Dim OffsetStart As UInteger = Disk.SectorToBytes(Disk.BPB.RootDirectoryRegionStart)
-            Dim OffsetEnd As UInteger = Disk.SectorToBytes(Disk.BPB.DataRegionStart)
+            Dim OffsetStart As UInteger = Disk.BPB.SectorToBytes(Disk.BPB.RootDirectoryRegionStart)
+            Dim OffsetEnd As UInteger = Disk.BPB.SectorToBytes(Disk.BPB.DataRegionStart)
 
             DirectoryBase.GetDirectoryData(Me, Me, OffsetStart, OffsetEnd, True)
         End Sub

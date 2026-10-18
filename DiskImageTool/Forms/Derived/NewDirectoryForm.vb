@@ -3,18 +3,25 @@ Public Class NewDirectoryForm
     Inherits FilePropertiesForm
 
     Private _NewDirectoryEntry As DirectoryEntryBase
+    Private _NewFilename As String
     Private _Updated As Boolean = False
 
     Public Sub New()
         MyBase.New()
 
-        MyBase.Text = "New Directory"
-        BtnUpdate.Text = "Add"
+        MyBase.Text = My.Resources.Caption_NewDirectory
+        BtnUpdate.Text = My.Resources.Button_Add
     End Sub
 
     Public ReadOnly Property NewDirectoryData As Byte()
         Get
-            Return _NewDirectoryEntry.Data
+            Return _NewDirectoryEntry?.Data
+        End Get
+    End Property
+
+    Public ReadOnly Property NewFilename As String
+        Get
+            Return _NewFilename
         End Get
     End Property
 
@@ -23,6 +30,14 @@ Public Class NewDirectoryForm
             Return _Updated
         End Get
     End Property
+
+    Public Shared Function Display() As (Updated As Boolean, HasLFN As Boolean, UseNTExtensions As Boolean, NewDirectoryData As Byte(), NewFilename As String)
+        Using dlg As New NewDirectoryForm()
+            dlg.ShowDialog(App.CurrentFormInstance)
+
+            Return (dlg.DialogResult = DialogResult.OK AndAlso dlg.Updated, dlg.HasLFN, dlg.UseNTExtensions, dlg.NewDirectoryData, dlg.NewFilename)
+        End Using
+    End Function
 
     Private Sub ApplyUpdate()
         _Updated = True
@@ -34,6 +49,9 @@ Public Class NewDirectoryForm
 
         If RadioFileShort.Checked Then
             ApplyFileNameUpdateShort(_NewDirectoryEntry)
+            _NewFilename = _NewDirectoryEntry.GetFileName
+        Else
+            _NewFilename = TxtLFN.Text
         End If
 
         ApplyFileDatesUpdate(_NewDirectoryEntry)
@@ -64,7 +82,7 @@ Public Class NewDirectoryForm
 
         TxtLFN.Text = ""
 
-        GroupFileName.Text = "Directory Name"
+        GroupFileName.Text = My.Resources.Label_DirectoryName
 
         ChkArchive.Checked = False
         ChkReadOnly.Checked = False

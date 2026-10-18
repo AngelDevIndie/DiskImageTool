@@ -30,8 +30,8 @@
     <TargetCulture>en-US</TargetCulture>
     <ProductName>DiskImageTool</ProductName>
     <PublisherName>Digitoxin</PublisherName>
-    <ApplicationRevision>0</ApplicationRevision>
-    <ApplicationVersion>2.7.0.%2a</ApplicationVersion>
+    <ApplicationRevision>1</ApplicationRevision>
+    <ApplicationVersion>2.44.0.%2a</ApplicationVersion>
     <UseApplicationTrust>false</UseApplicationTrust>
     <PublishWizardCompleted>true</PublishWizardCompleted>
     <BootstrapperEnabled>true</BootstrapperEnabled>
@@ -84,7 +84,7 @@
     <SignManifests>false</SignManifests>
   </PropertyGroup>
   <PropertyGroup>
-    <ApplicationIcon>Assets\floppyDisk.ico</ApplicationIcon>
+    <ApplicationIcon>Resources\floppyDisk.ico</ApplicationIcon>
   </PropertyGroup>
   <PropertyGroup>
     <ApplicationManifest>My Project\app.manifest</ApplicationManifest>
@@ -92,13 +92,22 @@
   <PropertyGroup>
     <TargetZone>LocalIntranet</TargetZone>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Publish|AnyCPU'">
+    <DebugSymbols>false</DebugSymbols>
+    <DefineTrace>true</DefineTrace>
+    <OutputPath>bin\Publish\</OutputPath>
+    <Optimize>true</Optimize>
+    <NoWarn>42016,41999,42017,42018,42019,42032,42036,42020,42021,42022</NoWarn>
+    <DebugType>none</DebugType>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <Prefer32Bit>true</Prefer32Bit>
+  </PropertyGroup>
   <ItemGroup>
     <Reference Include="CompactJson, Version=1.2.3.0, Culture=neutral, processorArchitecture=MSIL">
       <HintPath>..\packages\CompactJson.1.2.3\lib\net472\CompactJson.dll</HintPath>
     </Reference>
-    <Reference Include="Hb.Windows.Forms.HexBox2, Version=2.0.1.35160, Culture=neutral, PublicKeyToken=e0e5adf0ebc99863, processorArchitecture=MSIL">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\..\Hb.Hexeditor2\sources\Hb.Windows.Forms.HexBox\bin\Release\Hb.Windows.Forms.HexBox2.dll</HintPath>
+    <Reference Include="Greaseweazle">
+      <HintPath>H:\GIT\greaseweazle\src\Greaseweazle\bin\Release\net471\Greaseweazle.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Data" />
@@ -129,11 +138,40 @@
     <Import Include="System.Threading.Tasks" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="ApplicationEvents.vb" />
     <Compile Include="Bitstream\Bitstream.vb" />
+    <Compile Include="Bitstream\BitstreamRegionData.vb" />
+    <Compile Include="Controls\FloppyTrackGrid.vb">
+      <SubType>Component</SubType>
+    </Compile>
+    <Compile Include="Controls\HashPanel.Designer.vb">
+      <DependentUpon>HashPanel.vb</DependentUpon>
+    </Compile>
+    <Compile Include="Controls\HashPanel.vb">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="Controls\ListViewEx.vb">
+      <SubType>Component</SubType>
+    </Compile>
+    <Compile Include="Controls\PlaceholderTextBox.vb">
+      <SubType>Component</SubType>
+    </Compile>
+    <Compile Include="Controls\SelectablePanel.vb">
+      <SubType>Component</SubType>
+    </Compile>
+    <Compile Include="Controls\SplitButton.vb">
+      <SubType>Component</SubType>
+    </Compile>
+    <Compile Include="Controls\ToolStripSpringTextBox.vb">
+      <SubType>Component</SubType>
+    </Compile>
+    <Compile Include="Controls\TwoColumnTooltip.vb">
+      <SubType>Component</SubType>
+    </Compile>
+    <Compile Include="DirectoryScan.vb" />
     <Compile Include="DiskImage\AddFileOptions.vb" />
     <Compile Include="DiskImage\Modules\EnumDescriptions.vb" />
     <Compile Include="DiskImage\MappedFloppyImage.vb" />
-    <Compile Include="Bitstream\BitstreamDebug.vb" />
     <Compile Include="Bitstream\BitStreamImageBase.vb" />
     <Compile Include="Bitstream\BitstreamRegion.vb" />
     <Compile Include="Bitstream\BitstreamRegionSector.vb" />
@@ -143,19 +181,176 @@
     <Compile Include="Bitstream\IBM_MFM\IBM_MFM_Sector.vb" />
     <Compile Include="Bitstream\IBM_MFM\IBM_MFM_Tools.vb" />
     <Compile Include="Bitstream\IBM_MFM\IBM_MFM_Track.vb" />
-    <Compile Include="CurrentImage.vb" />
+    <Compile Include="DiskImageContainer.vb" />
     <Compile Include="DiskImage\DirectoryBase.vb" />
     <Compile Include="DiskImage\FAT12.vb" />
     <Compile Include="DiskImage\FATAllocation.vb" />
     <Compile Include="DiskImage\ImageHistory.vb" />
     <Compile Include="DiskImage\Modules\Structures.vb" />
     <Compile Include="DiskImage\Modules\UpdateFunctions.vb" />
-    <Compile Include="FileData.vb" />
+    <Compile Include="Extensions\TableLayoutExtensions.vb" />
+    <Compile Include="FilePanel\FileData.vb" />
+    <Compile Include="FilePanel\FileMenuLib.vb" />
+    <Compile Include="FilePanel\FilePanel.vb" />
+    <Compile Include="Flux\A2RLib.vb" />
+    <Compile Include="Flux\GeneralSettingsPanel.Designer.vb">
+      <DependentUpon>GeneralSettingsPanel.vb</DependentUpon>
+    </Compile>
+    <Compile Include="Flux\GeneralSettingsPanel.vb">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="Flux\Greaseweazle\Forms\ReadDiskForm.Init.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Flux\Greaseweazle\Forms\ReadDiskForm.Verify.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Flux\Greaseweazle\Models\ConvertingRange.vb" />
+    <Compile Include="Flux\Greaseweazle\Models\TrackRange.vb" />
+    <Compile Include="Flux\Greaseweazle\Models\TrackRead.vb" />
+    <Compile Include="Flux\Greaseweazle\Models\TrackReadDetails..vb" />
+    <Compile Include="Flux\Greaseweazle\Models\TrackReadOutOfRange.vb" />
+    <Compile Include="Flux\Greaseweazle\Models\TrackWrite.vb" />
+    <Compile Include="Flux\Greaseweazle\ReadDiskHelpers.vb" />
+    <Compile Include="Flux\Kryoflux\Models\DTCTrack.vb" />
+    <Compile Include="Flux\Kryoflux\Models\DTCTrackDetails.vb" />
+    <Compile Include="Forms\HexViewRawForm.Edit.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\ImagePreview.Designer.vb">
+      <DependentUpon>ImagePreview.vb</DependentUpon>
+    </Compile>
+    <Compile Include="Forms\ImagePreview.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\XMLViewForm.Designer.vb">
+      <DependentUpon>XMLViewForm.vb</DependentUpon>
+    </Compile>
+    <Compile Include="Forms\XMLViewForm.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="ImageFormats\TD0\TD0BytePattern.vb" />
+    <Compile Include="ImageFormats\TD0\TD0Comment.vb" />
+    <Compile Include="ImageFormats\TD0\TD0Crc16.vb" />
+    <Compile Include="ImageFormats\TD0\TD0Enums.vb" />
+    <Compile Include="ImageFormats\TD0\TD0FloppyImage.vb" />
+    <Compile Include="ImageFormats\TD0\TD0Header.vb" />
+    <Compile Include="ImageFormats\TD0\TD0Image.vb" />
+    <Compile Include="ImageFormats\TD0\TD0Loader.vb" />
+    <Compile Include="ImageFormats\TD0\TD0Lzhuf.vb" />
+    <Compile Include="ImageFormats\TD0\TD0Lzw.vb" />
+    <Compile Include="ImageFormats\TD0\TD0Rle.vb" />
+    <Compile Include="ImageFormats\TD0\TD0Sector.vb" />
+    <Compile Include="ImageFormats\TD0\TD0SectorDataHeader.vb" />
+    <Compile Include="ImageFormats\TD0\TD0SectorHeader.vb" />
+    <Compile Include="ImageFormats\TD0\TD0Track.vb" />
+    <Compile Include="ImageFormats\TD0\TD0TrackHeader.vb" />
+    <Compile Include="Lib\FileDialogFilterBuilder.vb" />
+    <Compile Include="Lib\VistaFolderPicker.vb" />
+    <Compile Include="Modules\Dialogs.vb" />
+    <Compile Include="Modules\FileIO.vb" />
+    <Compile Include="Modules\FloppyDB\Enums.vb" />
+    <Compile Include="Modules\FloppyDB\FileNameData.vb" />
+    <Compile Include="Modules\FloppyDB\FloppyData.vb" />
+    <Compile Include="Modules\FloppyDB\TitleFindResult.vb" />
+    <Compile Include="Modules\FloppyImageFormats.vb" />
+    <Compile Include="Modules\XMLDump.vb" />
+    <Compile Include="My Project\Resources.Designer.vb">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>Resources.resx</DependentUpon>
+    </Compile>
+    <Compile Include="Scanners\FilterScanner.vb" />
     <Compile Include="Filters\Enums.vb" />
     <Compile Include="Filters\FilterCounts.vb" />
     <Compile Include="Filters\FilterTag.vb" />
     <Compile Include="Filters\ImageFilters.vb" />
-    <Compile Include="FloppyDiskIO.vb" />
+    <Compile Include="Filters\ImageFiltersBase.vb" />
+    <Compile Include="DiskImageLib.vb" />
+    <Compile Include="Flux\DeviceLib.vb" />
+    <Compile Include="Flux\Enums.vb" />
+    <Compile Include="Flux\Greaseweazle\GreaseweazleDevice.vb" />
+    <Compile Include="Flux\Greaseweazle\SettingsPanel.Designer.vb">
+      <DependentUpon>SettingsPanel.vb</DependentUpon>
+    </Compile>
+    <Compile Include="Flux\Greaseweazle\SettingsPanel.vb">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="Flux\Greaseweazle\TrackStatus.vb" />
+    <Compile Include="Flux\Forms\ConvertImageForm.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Flux\IDevice.vb" />
+    <Compile Include="Flux\ISettings.vb" />
+    <Compile Include="Flux\ITrackStatus.vb" />
+    <Compile Include="Flux\Kryoflux\CommandLineBuilder.vb" />
+    <Compile Include="Flux\Kryoflux\ConsoleParser.vb" />
+    <Compile Include="Flux\Kryoflux\KryofluxDevice.vb" />
+    <Compile Include="Flux\Kryoflux\KryofluxLib.vb" />
+    <Compile Include="Flux\Kryoflux\SettingsPanel.Designer.vb">
+      <DependentUpon>SettingsPanel.vb</DependentUpon>
+    </Compile>
+    <Compile Include="Flux\Kryoflux\SettingsPanel.vb">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="Flux\Kryoflux\TrackStatus.vb" />
+    <Compile Include="Flux\PcImgCnv\CommandLineBuilder.vb" />
+    <Compile Include="Flux\PcImgCnv\ConsoleParser.vb" />
+    <Compile Include="Flux\PcImgCnv\PcImgCnvDevice.vb" />
+    <Compile Include="Flux\PcImgCnv\PcImgCnvLib.vb" />
+    <Compile Include="Flux\PcImgCnv\PcImgCnvSettings.vb" />
+    <Compile Include="Flux\PcImgCnv\SettingsPanel.Designer.vb">
+      <DependentUpon>SettingsPanel.vb</DependentUpon>
+    </Compile>
+    <Compile Include="Flux\PcImgCnv\SettingsPanel.vb">
+      <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Include="Flux\PcImgCnv\TrackStatus.vb" />
+    <Compile Include="Flux\SharedLib.vb" />
+    <Compile Include="Globals.vb" />
+    <Compile Include="Flux\Greaseweazle\Forms\CleanDiskForm.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Flux\Greaseweazle\Enums.vb" />
+    <Compile Include="Flux\Forms\ConfigurationForm.Designer.vb">
+      <DependentUpon>ConfigurationForm.vb</DependentUpon>
+    </Compile>
+    <Compile Include="Flux\Forms\ConfigurationForm.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Flux\Greaseweazle\Forms\EraseDiskForm.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Flux\Greaseweazle\GreaseweazleFormatters.vb" />
+    <Compile Include="Flux\Greaseweazle\GreaseweazleReadLog.vb" />
+    <Compile Include="Flux\Greaseweazle\GreaseweazleLib.vb" />
+    <Compile Include="Flux\Greaseweazle\GreaseweazleRunner.vb" />
+    <Compile Include="Flux\Forms\BaseFluxForm.Designer.vb">
+      <DependentUpon>BaseFluxForm.vb</DependentUpon>
+    </Compile>
+    <Compile Include="Flux\Forms\BaseFluxForm.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Flux\Greaseweazle\Forms\ReadDiskForm.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Flux\Greaseweazle\Forms\WriteDiskForm.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Flux\Kryoflux\KryofluxSettings.vb" />
+    <Compile Include="Scanners\IImageScanner.vb" />
+    <Compile Include="Scanners\ImageScanner.vb" />
+    <Compile Include="Resources\HelpStrings.Designer.vb">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>HelpStrings.resx</DependentUpon>
+    </Compile>
+    <Compile Include="Lib\ConsoleProcessRunner.vb" />
+    <Compile Include="MenuHelp.vb" />
+    <Compile Include="MenuTools.vb" />
+    <Compile Include="Modules\FileExport.vb" />
+    <Compile Include="Modules\FilenameTemplateHelper.vb" />
+    <Compile Include="Modules\FloppyDiskIO.vb" />
     <Compile Include="Bitstream\Interfaces\IBitstreamImage.vb" />
     <Compile Include="Bitstream\Interfaces\IBitstreamTrack.vb" />
     <Compile Include="Forms\FileDropForm.Designer.vb">
@@ -191,7 +386,29 @@
     <Compile Include="Forms\ImportFileForm.vb">
       <SubType>Form</SubType>
     </Compile>
-    <Compile Include="Github.vb" />
+    <Compile Include="Modules\Github.vb" />
+    <Compile Include="HexBox\BuiltInContextMenu.vb">
+      <SubType>Component</SubType>
+    </Compile>
+    <Compile Include="HexBox\ByteCharConverters.vb" />
+    <Compile Include="HexBox\ByteCollection.vb" />
+    <Compile Include="HexBox\BytePositionInfo.vb" />
+    <Compile Include="HexBox\DataBlock.vb" />
+    <Compile Include="HexBox\DataMap.vb" />
+    <Compile Include="HexBox\DynamicByteProvider.vb" />
+    <Compile Include="HexBox\DynamicFileByteProvider.vb" />
+    <Compile Include="HexBox\FileByteProvider.vb" />
+    <Compile Include="HexBox\FileDataBlock.vb" />
+    <Compile Include="HexBox\FindOptions.vb" />
+    <Compile Include="HexBox\HexBox.vb">
+      <SubType>Component</SubType>
+    </Compile>
+    <Compile Include="HexBox\HexCasing.vb" />
+    <Compile Include="HexBox\IByteCharConverter.vb" />
+    <Compile Include="HexBox\IByteProvider.vb" />
+    <Compile Include="HexBox\MemoryDataBlock.vb" />
+    <Compile Include="HexBox\NativeMethods.vb" />
+    <Compile Include="HexBox\Util.vb" />
     <Compile Include="HexView\HexViewDataGridInspector.vb" />
     <Compile Include="HexView\HexViewFunctions.vb" />
     <Compile Include="ImageFormats\86F\86FFloppyImage.vb" />
@@ -219,7 +436,9 @@
     <Compile Include="ImageFormats\PRI\PRIFileHeader.vb" />
     <Compile Include="ImageFormats\PRI\PRILoader.vb" />
     <Compile Include="ImageFormats\PRI\PRITrack.vb" />
-    <Compile Include="ImageIO.vb" />
+    <Compile Include="ImageFormats\PSI\PSITrackInfo.vb" />
+    <Compile Include="ImageFormats\TC\Functions.vb" />
+    <Compile Include="Modules\ImageIO.vb" />
     <Compile Include="ImageFormats\ImageConversion.vb" />
     <Compile Include="ImageFormats\MFM\MFMFloppyImage.vb" />
     <Compile Include="ImageFormats\MFM\MFMImage.vb" />
@@ -253,22 +472,42 @@
     <Compile Include="DiskImage\FATTables.vb" />
     <Compile Include="DiskImage\Modules\FloppyDiskFunctions.vb" />
     <Compile Include="DiskImage\Interfaces\IFloppyImage.vb" />
+    <Compile Include="DiskImage\Interfaces\IImageFieldSource.vb" />
     <Compile Include="DiskImage\SectorBlock.vb" />
     <Compile Include="Extensions\ByteArrayExtensions.vb" />
     <Compile Include="Extensions\DataGridViewExtensions.vb" />
     <Compile Include="Extensions\StringExtensions.vb" />
     <Compile Include="Extensions\XMLExtensions.vb" />
+    <Compile Include="Lib\ComboTrack.vb">
+      <SubType>Component</SubType>
+    </Compile>
     <Compile Include="Lib\CRC32Hash.vb" />
     <Compile Include="Lib\FloppyInterface.vb" />
-    <Compile Include="FormControls.vb" />
+    <Compile Include="Lib\FormControls.vb" />
     <Compile Include="Forms\AboutBox.Designer.vb">
       <DependentUpon>AboutBox.vb</DependentUpon>
     </Compile>
     <Compile Include="Forms\AboutBox.vb">
       <SubType>Form</SubType>
     </Compile>
-    <Compile Include="CopyProtection.vb" />
-    <Compile Include="SummaryPanel.vb" />
+    <Compile Include="Modules\CopyProtection.vb" />
+    <Compile Include="FilePanel\FilePanelColumns.vb" />
+    <Compile Include="LoadedFiles.vb" />
+    <Compile Include="Modules\LoadedImageList.vb" />
+    <Compile Include="Modules\Reports.vb" />
+    <Compile Include="Modules\SummaryPanel.vb" />
+    <Compile Include="Settings\AppSettings.vb" />
+    <Compile Include="Flux\Greaseweazle\DriveSettings.vb" />
+    <Compile Include="Settings\SettingsExpert.vb" />
+    <Compile Include="Settings\UserStateFluxConvertDevice.vb" />
+    <Compile Include="Settings\UserStateFluxConvert.vb" />
+    <Compile Include="Settings\UserStateETags.vb" />
+    <Compile Include="Flux\Greaseweazle\GreaseweazleSettings.vb" />
+    <Compile Include="Settings\UserStateFlux.vb" />
+    <Compile Include="Settings\SettingsGroup.vb" />
+    <Compile Include="Settings\UserState.vb" />
+    <Compile Include="Settings\UserStateFluxRead.vb" />
+    <Compile Include="Settings\UserStateFluxReadDevice.vb" />
     <Compile Include="Testing\DebugScript.vb" />
     <Compile Include="DiskImage\SectorData.vb" />
     <Compile Include="DiskImage\BasicSectorImage.vb" />
@@ -325,6 +564,12 @@
     <Compile Include="Forms\HexSearchForm.vb">
       <SubType>Form</SubType>
     </Compile>
+    <Compile Include="Forms\InsertBytesForm.Designer.vb">
+      <DependentUpon>InsertBytesForm.vb</DependentUpon>
+    </Compile>
+    <Compile Include="Forms\InsertBytesForm.vb">
+      <SubType>Form</SubType>
+    </Compile>
     <Compile Include="Forms\ImageLoadForm.Designer.vb">
       <DependentUpon>ImageLoadForm.vb</DependentUpon>
     </Compile>
@@ -335,6 +580,55 @@
       <DependentUpon>ReplaceFileForm.vb</DependentUpon>
     </Compile>
     <Compile Include="Forms\ReplaceFileForm.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\ImageForms\TransCopyImageForm.Designer.vb">
+      <DependentUpon>TransCopyImageForm.vb</DependentUpon>
+    </Compile>
+    <Compile Include="Forms\ImageForms\TransCopyImageForm.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\ImageForms\MFMImageForm.Designer.vb">
+      <DependentUpon>MFMImageForm.vb</DependentUpon>
+    </Compile>
+    <Compile Include="Forms\ImageForms\MFMImageForm.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\ImageForms\HFEImageForm.Designer.vb">
+      <DependentUpon>HFEImageForm.vb</DependentUpon>
+    </Compile>
+    <Compile Include="Forms\ImageForms\HFEImageForm.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\ImageForms\ImageFormShared.vb" />
+    <Compile Include="Forms\ImageForms\D86FImageForm.Designer.vb">
+      <DependentUpon>D86FImageForm.vb</DependentUpon>
+    </Compile>
+    <Compile Include="Forms\ImageForms\D86FImageForm.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\ImageForms\TD0ImageForm.Designer.vb">
+      <DependentUpon>TD0ImageForm.vb</DependentUpon>
+    </Compile>
+    <Compile Include="Forms\ImageForms\TD0ImageForm.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\ImageForms\IMDImageForm.Designer.vb">
+      <DependentUpon>IMDImageForm.vb</DependentUpon>
+    </Compile>
+    <Compile Include="Forms\ImageForms\IMDImageForm.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\ImageForms\PSIImageForm.Designer.vb">
+      <DependentUpon>PSIImageForm.vb</DependentUpon>
+    </Compile>
+    <Compile Include="Forms\ImageForms\PSIImageForm.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Forms\ImageForms\PRIImageForm.Designer.vb">
+      <DependentUpon>PRIImageForm.vb</DependentUpon>
+    </Compile>
+    <Compile Include="Forms\ImageForms\PRIImageForm.vb">
       <SubType>Form</SubType>
     </Compile>
     <Compile Include="Forms\UndeleteForm.Designer.vb">
@@ -354,7 +648,14 @@
     <Compile Include="Testing\ImageCompare.vb" />
     <Compile Include="Lib\ListViewHeader.vb" />
     <Compile Include="Lib\MyBitConverter.vb" />
-    <Compile Include="FloppyDB.vb" />
+    <Compile Include="Modules\FloppyDB\FloppyDB.vb" />
+    <Compile Include="Modules\Updater.vb" />
+    <Compile Include="Themes\AppTheme.vb" />
+    <Compile Include="Themes\ThemeForm.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Themes\ThemeManager.vb" />
+    <Compile Include="Themes\Themes.vb" />
     <Compile Include="Utility.vb" />
     <Compile Include="Controls\HexTextBox.vb">
       <SubType>Component</SubType>
@@ -371,10 +672,10 @@
     <Compile Include="HexView\HexViewRegionDescription.vb" />
     <Compile Include="HexView\HexViewSectorData.vb" />
     <Compile Include="HexView\HighlightedRegions.vb" />
-    <Compile Include="Lib\ListViewColumnSorter.vb" />
+    <Compile Include="FilePanel\FilePanelColumnSorter.vb" />
     <Compile Include="Extensions\ListViewExtensions.vb" />
     <Compile Include="HexView\MyByteProvider.vb" />
-    <Compile Include="BootstrapDB.vb" />
+    <Compile Include="Modules\BootstrapDB.vb" />
     <Compile Include="ImageData.vb" />
     <Compile Include="Lib\CRC32.vb" />
     <Compile Include="DiskImage\DirectoryEntry.vb" />
@@ -398,11 +699,6 @@
       <DependentUpon>Application.myapp</DependentUpon>
       <DesignTime>True</DesignTime>
     </Compile>
-    <Compile Include="My Project\Resources.Designer.vb">
-      <AutoGen>True</AutoGen>
-      <DesignTime>True</DesignTime>
-      <DependentUpon>Resources.resx</DependentUpon>
-    </Compile>
     <Compile Include="My Project\Settings.Designer.vb">
       <AutoGen>True</AutoGen>
       <DependentUpon>Settings.settings</DependentUpon>
@@ -424,8 +720,27 @@
       <SubType>Component</SubType>
     </Compile>
     <Compile Include="Lib\WindowsAPI.vb" />
+    <Compile Include="Scanners\LoadedImageScanner.vb" />
   </ItemGroup>
   <ItemGroup>
+    <EmbeddedResource Include="Controls\HashPanel.resx">
+      <DependentUpon>HashPanel.vb</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Flux\Forms\BaseFluxForm.resx">
+      <DependentUpon>BaseFluxForm.vb</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Flux\GeneralSettingsPanel.resx">
+      <DependentUpon>GeneralSettingsPanel.vb</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Flux\Greaseweazle\SettingsPanel.resx">
+      <DependentUpon>SettingsPanel.vb</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Flux\Kryoflux\SettingsPanel.resx">
+      <DependentUpon>SettingsPanel.vb</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Flux\PcImgCnv\SettingsPanel.resx">
+      <DependentUpon>SettingsPanel.vb</DependentUpon>
+    </EmbeddedResource>
     <EmbeddedResource Include="Forms\AboutBox.resx">
       <DependentUpon>AboutBox.vb</DependentUpon>
       <SubType>Designer</SubType>
@@ -436,6 +751,7 @@
     </EmbeddedResource>
     <EmbeddedResource Include="Forms\DeleteFileform.resx">
       <DependentUpon>DeleteFileform.vb</DependentUpon>
+      <SubType>Designer</SubType>
     </EmbeddedResource>
     <EmbeddedResource Include="Forms\FATEditForm.resx">
       <DependentUpon>FATEditForm.vb</DependentUpon>
@@ -443,6 +759,7 @@
     </EmbeddedResource>
     <EmbeddedResource Include="Forms\FileDropForm.resx">
       <DependentUpon>FileDropForm.vb</DependentUpon>
+      <SubType>Designer</SubType>
     </EmbeddedResource>
     <EmbeddedResource Include="Forms\FilePropertiesForm.resx">
       <DependentUpon>FilePropertiesForm.vb</DependentUpon>
@@ -450,6 +767,7 @@
     </EmbeddedResource>
     <EmbeddedResource Include="Forms\Derived\FilePropertiesFormMultiple.resx">
       <DependentUpon>FilePropertiesFormMultiple.vb</DependentUpon>
+      <SubType>Designer</SubType>
     </EmbeddedResource>
     <EmbeddedResource Include="Forms\FloppyAccessForm.resx">
       <DependentUpon>FloppyAccessForm.vb</DependentUpon>
@@ -457,16 +775,23 @@
     </EmbeddedResource>
     <EmbeddedResource Include="Forms\FloppyReadOptionsForm.resx">
       <DependentUpon>FloppyReadOptionsForm.vb</DependentUpon>
+      <SubType>Designer</SubType>
     </EmbeddedResource>
     <EmbeddedResource Include="Forms\FloppyWriteOptionsForm.resx">
       <DependentUpon>FloppyWriteOptionsForm.vb</DependentUpon>
+      <SubType>Designer</SubType>
     </EmbeddedResource>
     <EmbeddedResource Include="Forms\HexSearchForm.resx">
       <DependentUpon>HexSearchForm.vb</DependentUpon>
       <SubType>Designer</SubType>
     </EmbeddedResource>
+    <EmbeddedResource Include="Forms\InsertBytesForm.resx">
+      <DependentUpon>InsertBytesForm.vb</DependentUpon>
+      <SubType>Designer</SubType>
+    </EmbeddedResource>
     <EmbeddedResource Include="Forms\HexViewRawForm.resx">
       <DependentUpon>HexViewRawForm.vb</DependentUpon>
+      <SubType>Designer</SubType>
     </EmbeddedResource>
     <EmbeddedResource Include="Forms\ImageCreationForm.resx">
       <DependentUpon>ImageCreationForm.vb</DependentUpon>
@@ -475,8 +800,12 @@
       <DependentUpon>ImageLoadForm.vb</DependentUpon>
       <SubType>Designer</SubType>
     </EmbeddedResource>
+    <EmbeddedResource Include="Forms\ImagePreview.resx">
+      <DependentUpon>ImagePreview.vb</DependentUpon>
+    </EmbeddedResource>
     <EmbeddedResource Include="Forms\ImportFileForm.resx">
       <DependentUpon>ImportFileForm.vb</DependentUpon>
+      <SubType>Designer</SubType>
     </EmbeddedResource>
     <EmbeddedResource Include="Forms\ItemScanForm.resx">
       <DependentUpon>ItemScanForm.vb</DependentUpon>
@@ -485,11 +814,58 @@
     <EmbeddedResource Include="Forms\ReplaceFileForm.resx">
       <DependentUpon>ReplaceFileForm.vb</DependentUpon>
     </EmbeddedResource>
+    <EmbeddedResource Include="Forms\ImageForms\TransCopyImageForm.resx">
+      <DependentUpon>TransCopyImageForm.vb</DependentUpon>
+      <SubType>Designer</SubType>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Forms\ImageForms\MFMImageForm.resx">
+      <DependentUpon>MFMImageForm.vb</DependentUpon>
+      <SubType>Designer</SubType>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Forms\ImageForms\HFEImageForm.resx">
+      <DependentUpon>HFEImageForm.vb</DependentUpon>
+      <SubType>Designer</SubType>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Forms\ImageForms\D86FImageForm.resx">
+      <DependentUpon>D86FImageForm.vb</DependentUpon>
+      <SubType>Designer</SubType>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Forms\ImageForms\PRIImageForm.resx">
+      <DependentUpon>PRIImageForm.vb</DependentUpon>
+      <SubType>Designer</SubType>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Forms\ImageForms\PSIImageForm.resx">
+      <DependentUpon>PSIImageForm.vb</DependentUpon>
+      <SubType>Designer</SubType>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Forms\ImageForms\IMDImageForm.resx">
+      <DependentUpon>IMDImageForm.vb</DependentUpon>
+      <SubType>Designer</SubType>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Forms\ImageForms\TD0ImageForm.resx">
+      <DependentUpon>TD0ImageForm.vb</DependentUpon>
+      <SubType>Designer</SubType>
+    </EmbeddedResource>
     <EmbeddedResource Include="Forms\UndeleteForm.resx">
       <DependentUpon>UndeleteForm.vb</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="Forms\VolumeSerialNumberForm.resx">
       <DependentUpon>VolumeSerialNumberForm.vb</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Flux\Forms\ConfigurationForm.resx">
+      <DependentUpon>ConfigurationForm.vb</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Forms\XMLViewForm.resx">
+      <DependentUpon>XMLViewForm.vb</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Resources\HelpStrings.de.resx" />
+    <EmbeddedResource Include="Resources\HelpStrings.es.resx" />
+    <EmbeddedResource Include="Resources\HelpStrings.fr.resx" />
+    <EmbeddedResource Include="Resources\HelpStrings.zh-CN.resx" />
+    <EmbeddedResource Include="Resources\HelpStrings.resx">
+      <CustomToolNamespace>My.Resources</CustomToolNamespace>
+      <Generator>ResXFileCodeGenerator</Generator>
+      <LastGenOutput>HelpStrings.Designer.vb</LastGenOutput>
     </EmbeddedResource>
     <EmbeddedResource Include="MainForm.resx">
       <DependentUpon>MainForm.vb</DependentUpon>
@@ -499,11 +875,23 @@
       <DependentUpon>HexViewForm.vb</DependentUpon>
       <SubType>Designer</SubType>
     </EmbeddedResource>
+    <EmbeddedResource Include="My Project\Resources.de.resx">
+      <SubType>Designer</SubType>
+    </EmbeddedResource>
+    <EmbeddedResource Include="My Project\Resources.es.resx">
+      <SubType>Designer</SubType>
+    </EmbeddedResource>
+    <EmbeddedResource Include="My Project\Resources.fr.resx">
+      <SubType>Designer</SubType>
+    </EmbeddedResource>
+    <EmbeddedResource Include="My Project\Resources.zh-CN.resx">
+      <SubType>Designer</SubType>
+    </EmbeddedResource>
     <EmbeddedResource Include="My Project\Resources.resx">
       <Generator>VbMyResourcesResXFileCodeGenerator</Generator>
-      <LastGenOutput>Resources.Designer.vb</LastGenOutput>
       <CustomToolNamespace>My.Resources</CustomToolNamespace>
       <SubType>Designer</SubType>
+      <LastGenOutput>Resources.Designer.vb</LastGenOutput>
     </EmbeddedResource>
     <EmbeddedResource Include="Forms\SaveAllForm.resx">
       <DependentUpon>SaveAllForm.vb</DependentUpon>
@@ -513,7 +901,6 @@
     </EmbeddedResource>
   </ItemGroup>
   <ItemGroup>
-    <None Include="DiskImageTool_TemporaryKey.pfx" />
     <None Include="My Project\app.manifest" />
     <None Include="My Project\Application.myapp">
       <Generator>MyApplicationCodeGenerator</Generator>
@@ -540,14 +927,69 @@
     </BootstrapperPackage>
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="Assets\bootsector.xml" />
-    <Content Include="Assets\floppyDisk.ico" />
-    <None Include="FloppyDB.xml">
+    <None Include="Resources\images\Fill4E.png" />
+    <None Include="Resources\images\MobyGames.png" />
+    <None Include="Resources\images\HelpTableOfContents.png" />
+    <None Include="Resources\images\FolderHex.png" />
+    <None Include="Resources\images\BinaryFile.png" />
+    <None Include="Resources\images\HexFile.png" />
+    <None Include="Resources\images\NewFolder.png" />
+    <None Include="Resources\images\DeleteDocument.png" />
+    <None Include="Resources\images\Delete.png" />
+    <None Include="Resources\images\SwitchFolders.png" />
+    <None Include="Resources\images\History.png" />
+    <None Include="Resources\images\Web.png" />
+    <None Include="Resources\images\AboutBox.png" />
+    <None Include="Resources\images\NewDocument.png" />
+    <None Include="Resources\images\Refresh.png" />
+    <None Include="Resources\images\Instance.png" />
+    <None Include="Resources\images\AdjustOffset.png" />
+    <None Include="Resources\images\AppIconLarge.png" />
+    <None Include="Resources\images\VolumeSerialNumber.png" />
+    <None Include="Resources\images\Fill00.png" />
+    <None Include="Resources\images\SelectAll.png" />
+    <None Include="Resources\images\CopyHexFormatted.png" />
+    <None Include="Resources\images\SelectSector.png" />
+    <None Include="Resources\images\SelectTrack.png" />
+    <None Include="Resources\images\FillF6.png" />
+    <None Include="Resources\images\FindNext.png" />
+    <None Include="Resources\images\PasteReplace.png" />
+    <None Include="Resources\images\Search.png" />
+    <None Include="Resources\images\Copy.png" />
+    <None Include="Resources\images\TextBlock.png" />
+    <None Include="Resources\images\Exit.png" />
+    <None Include="Resources\images\TextArea.png" />
+    <None Include="Resources\images\TextFile.png" />
+    <None Include="Resources\images\OpenfileDialog.png" />
+    <None Include="Resources\images\PropertiesFolderClosed.png" />
+    <None Include="Resources\images\Export.png" />
+    <None Include="Resources\images\Redo.png" />
+    <None Include="Resources\images\Undo.png" />
+    <None Include="Resources\images\CloseAll.png" />
+    <None Include="Resources\images\Close.png" />
+    <None Include="Resources\images\SaveAll.png" />
+    <None Include="Resources\images\SaveAs.png" />
+    <None Include="Resources\images\Save.png" />
+    <None Include="Resources\images\Import.png" />
+    <None Include="Resources\images\ImportFiles.png" />
+    <EmbeddedResource Include="Resources\bootsector.xml" />
+    <Content Include="..\..\FloppyDB\FloppyDB.xml">
+      <Link>FloppyDB.xml</Link>
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </None>
-    <EmbeddedResource Include="Assets\License.txt" />
-    <EmbeddedResource Include="Assets\bootstrap.xml" />
+    </Content>
+    <Content Include="Resources\floppyDisk.ico" />
+    <EmbeddedResource Include="Resources\fonts\Mx437_IBM_VGA_9x16.ttf">
+      <LogicalName>DiskImageTool.Mx437_IBM_VGA_9x16.ttf</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Resources\License.txt" />
+    <EmbeddedResource Include="Resources\bootstrap.xml" />
   </ItemGroup>
-  <ItemGroup />
+  <ItemGroup>
+    <Folder Include="Flux\Kryoflux\Forms\" />
+    <Folder Include="ImageFormats\DMK\" />
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.VisualBasic.targets" />
+  <PropertyGroup>
+    <PostBuildEvent>if /I "$(ConfigurationName)"=="Publish" pwsh.exe -NoProfile -ExecutionPolicy Bypass -File "$(MSBuildProjectDirectory)\PostBuildZip.ps1" "$(TargetPath)"</PostBuildEvent>
+  </PropertyGroup>
 </Project>

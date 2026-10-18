@@ -53,7 +53,7 @@ Partial Class FloppyReadOptionsForm
         Me.BtnOK.Name = "BtnOK"
         Me.BtnOK.Size = New System.Drawing.Size(90, 23)
         Me.BtnOK.TabIndex = 0
-        Me.BtnOK.Text = "&Ok"
+        Me.BtnOK.Text = "{&Ok}"
         Me.BtnOK.UseVisualStyleBackColor = True
         '
         'BtnCancel
@@ -64,7 +64,7 @@ Partial Class FloppyReadOptionsForm
         Me.BtnCancel.Name = "BtnCancel"
         Me.BtnCancel.Size = New System.Drawing.Size(90, 23)
         Me.BtnCancel.TabIndex = 1
-        Me.BtnCancel.Text = "&Cancel"
+        Me.BtnCancel.Text = "{&Cancel}"
         Me.BtnCancel.UseVisualStyleBackColor = True
         '
         'ComboDiskType
@@ -83,9 +83,9 @@ Partial Class FloppyReadOptionsForm
         Me.Label1.AutoSize = True
         Me.Label1.Location = New System.Drawing.Point(58, 44)
         Me.Label1.Name = "Label1"
-        Me.Label1.Size = New System.Drawing.Size(89, 13)
+        Me.Label1.Size = New System.Drawing.Size(97, 13)
         Me.Label1.TabIndex = 0
-        Me.Label1.Text = "Floppy Disk Type"
+        Me.Label1.Text = "{Floppy Disk Type}"
         '
         'lblMessage
         '
@@ -94,7 +94,7 @@ Partial Class FloppyReadOptionsForm
         Me.lblMessage.Name = "lblMessage"
         Me.lblMessage.Size = New System.Drawing.Size(273, 21)
         Me.lblMessage.TabIndex = 3
-        Me.lblMessage.Text = "Message"
+        Me.lblMessage.Text = "{Message}"
         Me.lblMessage.TextAlign = System.Drawing.ContentAlignment.TopCenter
         Me.lblMessage.UseMnemonic = False
         '
@@ -116,7 +116,6 @@ Partial Class FloppyReadOptionsForm
         Me.ShowIcon = False
         Me.ShowInTaskbar = False
         Me.StartPosition = System.Windows.Forms.FormStartPosition.CenterParent
-        Me.Text = "Choose Disk Type"
         Me.FlowLayoutPanel1.ResumeLayout(False)
         Me.ResumeLayout(False)
         Me.PerformLayout()

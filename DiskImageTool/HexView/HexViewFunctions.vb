@@ -2,7 +2,7 @@
 Imports System.Runtime.InteropServices
 Imports System.Text.RegularExpressions
 Imports System.Threading
-Imports Hb.Windows.Forms
+Imports DiskImageTool.Hb.Windows.Forms
 
 Namespace HexView
     Module HexViewFunctions
@@ -31,7 +31,7 @@ Namespace HexView
             Hex = Hex.Replace(Chr(10), "")
             Hex = Hex.Replace(Chr(9), "")
 
-            Dim regex = New Regex("^[0-9A-F]*$", RegexOptions.IgnoreCase)
+            Dim regex As New Regex("^[0-9A-F]*$", RegexOptions.IgnoreCase)
 
             Dim HexArray As String()
             If regex.IsMatch(Hex) Then
@@ -61,13 +61,16 @@ Namespace HexView
             Return ByteArray
         End Function
 
-        Public Sub CopyHexFormatted(HexBox As HexBox)
-            Dim Capacity As Integer = HexBox.SelectionLength * 2 + HexBox.SelectionLength + HexBox.SelectionLength \ 16
-            Dim SB = New System.Text.StringBuilder(Capacity)
+        Public Sub CopyHex(HexBox As HexBox, Formatted As Boolean)
+            Dim Capacity As Integer = HexBox.SelectionLength * 2 + HexBox.SelectionLength
+            If Formatted Then
+                Capacity += HexBox.SelectionLength \ 16
+            End If
+            Dim SB As New System.Text.StringBuilder(Capacity)
             For Counter = 0 To HexBox.SelectionLength - 1
                 Dim B = HexBox.ByteProvider.ReadByte(HexBox.SelectionStart + Counter)
                 SB.Append(B.ToString("X2"))
-                If (Counter + 1) Mod 16 = 0 Then
+                If Formatted AndAlso (Counter + 1) Mod 16 = 0 Then
                     SB.Append(vbNewLine)
                 Else
                     SB.Append(" ")

@@ -35,7 +35,7 @@
                 _DataRate = 0
                 If Gap4A > 0 Then
                     AddGap(Gap4A)
-                    AddSync(MFM_SYNC_SIZE)
+                    AddSync(MFM_SYNC_NULL_BYTES)
                     AddIAM()
                     AddAddressMarkIndex()
                 End If
@@ -69,7 +69,7 @@
             End Property
 
             Public Sub AddData(Data() As Byte, Gap3 As UInteger)
-                AddSync(MFM_SYNC_SIZE)
+                AddSync(MFM_SYNC_NULL_BYTES)
                 Dim Start = _Bitstream.Length
                 AddMFM(MFMAddressMark.Data)
                 AppendBytes(Data)
@@ -80,8 +80,8 @@
                 End If
             End Sub
 
-            Public Sub AddSectorId(Cylinder As Byte, Head As Byte, SectorId As Byte, Size As MFMSectorSize)
-                AddSync(MFM_SYNC_SIZE)
+            Public Sub AddSectorId(Cylinder As Byte, Head As Byte, SectorId As Byte, Size As MFMSectorSize, Gap2 As UInteger)
+                AddSync(MFM_SYNC_NULL_BYTES)
                 Dim Start = _Bitstream.Length
                 AddMFM(MFMAddressMark.ID)
                 AddAddressMarkIndex()
@@ -91,7 +91,7 @@
                 AppendByte(Size)
                 Dim Checksum = CalculateChecksum(Start, _Bitstream.Length - Start)
                 AppendBytes(BitConverter.GetBytes(Checksum))
-                AddGap(MFM_GAP2_SIZE)
+                AddGap(Gap2)
             End Sub
 
             Public Function CalculateChecksum(Start As UInteger, Length As UInteger) As UShort
@@ -104,7 +104,7 @@
                 _RPM = RPM
                 _DataRate = DataRate
 
-                Dim MaxSize = GetMaxSize(RPM, DataRate)
+                Dim MaxSize = MFMGetSize(RPM, DataRate)
                 Dim Diff = MaxSize - _Bitstream.Length
                 If Diff > 0 Then
                     AddGap(Diff \ 16)
@@ -127,13 +127,13 @@
             End Sub
 
             Private Sub AddIAM()
-                Dim Newbits = BytesToBits(MFM_IAM_Sync_Bytes)
+                Dim Newbits = BytesToBits(MFM_IAM_SYNC_PATTERN_BYTES)
                 AppendBits(Newbits)
                 AppendByte(MFMAddressMark.Index)
             End Sub
 
             Private Sub AddMFM(AddressMArk As MFMAddressMark)
-                Dim Newbits = BytesToBits(MFM_Sync_Bytes)
+                Dim Newbits = BytesToBits(MFM_SYNC_PATTERN_BYTES)
                 AppendBits(Newbits)
                 AppendByte(AddressMArk)
             End Sub
@@ -163,8 +163,8 @@
             End Sub
 
             Private Function BitsToBytes(Bitstream As BitArray) As Byte()
-                Dim Length = Bitstream.Length \ 8
-                Dim PaddedLength = Math.Ceiling(Length / 256) * 256
+                Dim Length As UInteger = Bitstream.Length \ 8
+                Dim PaddedLength = AlignUp(Length, 256)
 
                 Dim buffer(Length - 1) As Byte
 
@@ -191,13 +191,6 @@
                 Else
                     Return _Bitstream.Get(_Bitstream.Length - 1)
                 End If
-            End Function
-
-            Private Function GetMaxSize(RPM As UShort, DataRate As UShort) As UInteger
-                Dim MicrosecondsPerRev As Single = 1 / RPM * 60 * 1000000
-                Dim MicrossecondsPerBit As Single = DataRate / 1000
-
-                Return Math.Ceiling(MicrosecondsPerRev * MicrossecondsPerBit / 8) * 16
             End Function
         End Class
     End Namespace

@@ -1,0 +1,78 @@
+﻿Imports System.Globalization
+Imports System.Text.RegularExpressions
+
+Namespace Flux.Kryoflux
+    Public Class ConsoleParser
+        Public Const REGEX_STREAM_FILE As String = "^Stream file:\s?(?<filePath>.+)$"
+        Public Const REGEX_TRACK As String = "^(?<track>\d+)\.(?<side>\d+)\s*:\s?(?<encoding>[^:]+):\s?<?(?<status>\w+)\*?>?(,\s?trk:\s?(?<MFMTrack>\d+))?(\[(?<physicalTrack>\d+)\])?(,\s?sec:\s?(?<sectors>\d+))?(,\s?bad:\s?(?<bad>\d+))?(,\s?mis:\s?(?<mis>\d+))?(, \*(?<flags>\w+)( \+(?<modifiedSectors>\d+))?)?"
+        Public Const REGEX_TRACK_DETAILS As String = "^(?<encoding>[^:]+):\s?<?(?<status>\w+)\*?>?(,\s?trk:\s?(?<MFMTrack>\d+))?(\[(?<physicalTrack>\d+)\])?(,\s?sec:\s?(?<sectors>\d+))?(,\s?bad:\s?(?<bad>\d+))?(,\s?mis:\s?(?<mis>\d+))?(, \*(?<flags>\w+)( \+(?<modifiedSectors>\d+))?)?"
+        Public Const REGEX_TRACK_SUMMARY As String = "^(?<track>\d+)\.(?<side>\d+)\s*:\s?(?<details>.+)"
+        Private ReadOnly RegExTrackDetails As New Regex(REGEX_TRACK_DETAILS, RegexOptions.IgnoreCase Or RegexOptions.CultureInvariant Or RegexOptions.Compiled)
+        Private ReadOnly RegExTrackSummary As New Regex(REGEX_TRACK_SUMMARY, RegexOptions.IgnoreCase Or RegexOptions.CultureInvariant Or RegexOptions.Compiled)
+
+        Public Function ParseTrack(line As String) As DTCTrack
+            Dim TrackSummary = ParseTrackSummary(line)
+
+            If TrackSummary IsNot Nothing Then
+                TrackSummary.Details = ParseTrackDetails(TrackSummary.DetailString)
+            End If
+
+            Return TrackSummary
+        End Function
+
+        Private Shared Function GetInt(m As Match, name As String) As Integer
+            Dim v As Integer = 0
+            Integer.TryParse(m.Groups(name).Value, NumberStyles.None, CultureInfo.InvariantCulture, v)
+            Return v
+        End Function
+
+        Private Shared Function GetIntOrDefault(m As Match, name As String, def As Integer) As Integer
+            If Not m.Groups(name).Success Then Return def
+            Return GetInt(m, name)
+        End Function
+
+        Private Function ParseTrackDetails(line As String) As DTCTrackDetails
+            If String.IsNullOrWhiteSpace(line) Then
+                Return Nothing
+            End If
+
+            Dim Match = RegExTrackDetails.Match(line)
+            If Not Match.Success Then
+                Return Nothing
+            End If
+
+            Dim info As New DTCTrackDetails With {
+                .Encoding = Match.Groups("encoding").Value.Trim(),
+                .Status = Match.Groups("status").Value.Trim(),
+                .MFMTrack = GetIntOrDefault(Match, "MFMTrack", -1),
+                .PhysicalTrack = GetIntOrDefault(Match, "physicalTrack", -1),
+                .SectorCount = GetIntOrDefault(Match, "sectors", 0),
+                .BadSectorCount = GetIntOrDefault(Match, "bad", 0),
+                .MissingSectorCount = GetIntOrDefault(Match, "mis", 0),
+                .ModifiedSectorCount = GetIntOrDefault(Match, "modifiedSectors", 0),
+                .Flags = Match.Groups("flags").Value.Trim()
+            }
+
+            Return info
+        End Function
+
+        Private Function ParseTrackSummary(line As String) As DTCTrack
+            If String.IsNullOrWhiteSpace(line) Then
+                Return Nothing
+            End If
+
+            Dim Match = RegExTrackSummary.Match(line)
+            If Not Match.Success Then
+                Return Nothing
+            End If
+
+            Dim info As New DTCTrack With {
+                .Track = GetInt(Match, "track"),
+                .Side = GetInt(Match, "side"),
+                .DetailString = Match.Groups("details").Value.Trim()
+            }
+
+            Return info
+        End Function
+    End Class
+End Namespace

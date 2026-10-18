@@ -5,10 +5,11 @@
         Disk_CustomFormat
         Disk_NOBPB
         Disk_NoBootLoader
-        DIsk_CustomBootLoader
+        Disk_CustomBootLoader
         Disk_MismatchedImageSize
         Disk_MismatchedMediaDescriptor
         Disk_FreeClustersWithData
+        Disk_HasWriteSplices
         Bootstrap_Unknown
         OEMName_Unknown
         OEMName_Mismatched
@@ -30,6 +31,9 @@
         Image_NotInDatabase
         Image_Verified
         Image_Unverified
+        Image_InTDC
+        Image_NotInTDC
+        Image_InTGOD
         Database_MismatchedStatus
     End Enum
 

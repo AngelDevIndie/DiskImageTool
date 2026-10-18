@@ -1,9 +1,9 @@
-﻿<Global.Microsoft.VisualBasic.CompilerServices.DesignerGenerated()> _
+﻿<Global.Microsoft.VisualBasic.CompilerServices.DesignerGenerated()>
 Partial Class VolumeSerialNumberForm
     Inherits System.Windows.Forms.Form
 
     'Form overrides dispose to clean up the component list.
-    <System.Diagnostics.DebuggerNonUserCode()> _
+    <System.Diagnostics.DebuggerNonUserCode()>
     Protected Overrides Sub Dispose(ByVal disposing As Boolean)
         Try
             If disposing AndAlso components IsNot Nothing Then
@@ -20,29 +20,26 @@ Partial Class VolumeSerialNumberForm
     'NOTE: The following procedure is required by the Windows Form Designer
     'It can be modified using the Windows Form Designer.  
     'Do not modify it using the code editor.
-    <System.Diagnostics.DebuggerStepThrough()> _
+    <System.Diagnostics.DebuggerStepThrough()>
     Private Sub InitializeComponent()
         Dim TableLayoutPanel1 As System.Windows.Forms.TableLayoutPanel
-        Dim Label1 As System.Windows.Forms.Label
-        Dim Label3 As System.Windows.Forms.Label
-        Dim Label2 As System.Windows.Forms.Label
-        Dim FlowLayoutPanel2 As System.Windows.Forms.FlowLayoutPanel
-        Dim FlowLayoutPanel1 As System.Windows.Forms.FlowLayoutPanel
+        Dim PanelBottom As System.Windows.Forms.FlowLayoutPanel
+        Dim PanelMain As System.Windows.Forms.Panel
         Me.DTDate = New System.Windows.Forms.DateTimePicker()
+        Me.LabelDate = New System.Windows.Forms.Label()
         Me.DTTime = New System.Windows.Forms.DateTimePicker()
+        Me.LabelMilliseconds = New System.Windows.Forms.Label()
         Me.NumMS = New System.Windows.Forms.NumericUpDown()
-        Me.BtnOK = New System.Windows.Forms.Button()
+        Me.LabelTime = New System.Windows.Forms.Label()
         Me.BtnCancel = New System.Windows.Forms.Button()
+        Me.BtnOK = New System.Windows.Forms.Button()
         TableLayoutPanel1 = New System.Windows.Forms.TableLayoutPanel()
-        Label1 = New System.Windows.Forms.Label()
-        Label3 = New System.Windows.Forms.Label()
-        Label2 = New System.Windows.Forms.Label()
-        FlowLayoutPanel2 = New System.Windows.Forms.FlowLayoutPanel()
-        FlowLayoutPanel1 = New System.Windows.Forms.FlowLayoutPanel()
+        PanelBottom = New System.Windows.Forms.FlowLayoutPanel()
+        PanelMain = New System.Windows.Forms.Panel()
         TableLayoutPanel1.SuspendLayout()
         CType(Me.NumMS, System.ComponentModel.ISupportInitialize).BeginInit()
-        FlowLayoutPanel2.SuspendLayout()
-        FlowLayoutPanel1.SuspendLayout()
+        PanelBottom.SuspendLayout()
+        PanelMain.SuspendLayout()
         Me.SuspendLayout()
         '
         'TableLayoutPanel1
@@ -54,18 +51,18 @@ Partial Class VolumeSerialNumberForm
         TableLayoutPanel1.ColumnStyles.Add(New System.Windows.Forms.ColumnStyle())
         TableLayoutPanel1.ColumnStyles.Add(New System.Windows.Forms.ColumnStyle())
         TableLayoutPanel1.Controls.Add(Me.DTDate, 0, 1)
-        TableLayoutPanel1.Controls.Add(Label1, 0, 0)
+        TableLayoutPanel1.Controls.Add(Me.LabelDate, 0, 0)
         TableLayoutPanel1.Controls.Add(Me.DTTime, 1, 1)
-        TableLayoutPanel1.Controls.Add(Label3, 2, 0)
+        TableLayoutPanel1.Controls.Add(Me.LabelMilliseconds, 2, 0)
         TableLayoutPanel1.Controls.Add(Me.NumMS, 2, 1)
-        TableLayoutPanel1.Controls.Add(Label2, 1, 0)
-        TableLayoutPanel1.Location = New System.Drawing.Point(3, 3)
+        TableLayoutPanel1.Controls.Add(Me.LabelTime, 1, 0)
+        TableLayoutPanel1.Location = New System.Drawing.Point(18, 18)
         TableLayoutPanel1.Name = "TableLayoutPanel1"
         TableLayoutPanel1.RowCount = 2
         TableLayoutPanel1.RowStyles.Add(New System.Windows.Forms.RowStyle())
         TableLayoutPanel1.RowStyles.Add(New System.Windows.Forms.RowStyle())
         TableLayoutPanel1.RowStyles.Add(New System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 20.0!))
-        TableLayoutPanel1.Size = New System.Drawing.Size(276, 39)
+        TableLayoutPanel1.Size = New System.Drawing.Size(284, 39)
         TableLayoutPanel1.TabIndex = 0
         '
         'DTDate
@@ -78,15 +75,15 @@ Partial Class VolumeSerialNumberForm
         Me.DTDate.Size = New System.Drawing.Size(97, 20)
         Me.DTDate.TabIndex = 3
         '
-        'Label1
+        'LabelDate
         '
-        Label1.Anchor = System.Windows.Forms.AnchorStyles.Left
-        Label1.AutoSize = True
-        Label1.Location = New System.Drawing.Point(3, 0)
-        Label1.Name = "Label1"
-        Label1.Size = New System.Drawing.Size(30, 13)
-        Label1.TabIndex = 0
-        Label1.Text = "Date"
+        Me.LabelDate.Anchor = System.Windows.Forms.AnchorStyles.Left
+        Me.LabelDate.AutoSize = True
+        Me.LabelDate.Location = New System.Drawing.Point(3, 0)
+        Me.LabelDate.Name = "LabelDate"
+        Me.LabelDate.Size = New System.Drawing.Size(38, 13)
+        Me.LabelDate.TabIndex = 0
+        Me.LabelDate.Text = "{Date}"
         '
         'DTTime
         '
@@ -99,15 +96,15 @@ Partial Class VolumeSerialNumberForm
         Me.DTTime.Size = New System.Drawing.Size(97, 20)
         Me.DTTime.TabIndex = 4
         '
-        'Label3
+        'LabelMilliseconds
         '
-        Label3.Anchor = System.Windows.Forms.AnchorStyles.Left
-        Label3.AutoSize = True
-        Label3.Location = New System.Drawing.Point(209, 0)
-        Label3.Name = "Label3"
-        Label3.Size = New System.Drawing.Size(64, 13)
-        Label3.TabIndex = 2
-        Label3.Text = "Milliseconds"
+        Me.LabelMilliseconds.Anchor = System.Windows.Forms.AnchorStyles.Left
+        Me.LabelMilliseconds.AutoSize = True
+        Me.LabelMilliseconds.Location = New System.Drawing.Point(209, 0)
+        Me.LabelMilliseconds.Name = "LabelMilliseconds"
+        Me.LabelMilliseconds.Size = New System.Drawing.Size(72, 13)
+        Me.LabelMilliseconds.TabIndex = 2
+        Me.LabelMilliseconds.Text = "{Milliseconds}"
         '
         'NumMS
         '
@@ -118,85 +115,86 @@ Partial Class VolumeSerialNumberForm
         Me.NumMS.Size = New System.Drawing.Size(64, 20)
         Me.NumMS.TabIndex = 5
         '
-        'Label2
+        'LabelTime
         '
-        Label2.Anchor = System.Windows.Forms.AnchorStyles.Left
-        Label2.AutoSize = True
-        Label2.Location = New System.Drawing.Point(106, 0)
-        Label2.Name = "Label2"
-        Label2.Size = New System.Drawing.Size(30, 13)
-        Label2.TabIndex = 1
-        Label2.Text = "Time"
+        Me.LabelTime.Anchor = System.Windows.Forms.AnchorStyles.Left
+        Me.LabelTime.AutoSize = True
+        Me.LabelTime.Location = New System.Drawing.Point(106, 0)
+        Me.LabelTime.Name = "LabelTime"
+        Me.LabelTime.Size = New System.Drawing.Size(38, 13)
+        Me.LabelTime.TabIndex = 1
+        Me.LabelTime.Text = "{Time}"
         '
-        'FlowLayoutPanel2
+        'PanelBottom
         '
-        FlowLayoutPanel2.Anchor = System.Windows.Forms.AnchorStyles.Top
-        FlowLayoutPanel2.AutoSize = True
-        FlowLayoutPanel2.AutoSizeMode = System.Windows.Forms.AutoSizeMode.GrowAndShrink
-        FlowLayoutPanel2.Controls.Add(Me.BtnOK)
-        FlowLayoutPanel2.Controls.Add(Me.BtnCancel)
-        FlowLayoutPanel2.Location = New System.Drawing.Point(45, 48)
-        FlowLayoutPanel2.Name = "FlowLayoutPanel2"
-        FlowLayoutPanel2.Size = New System.Drawing.Size(192, 29)
-        FlowLayoutPanel2.TabIndex = 1
-        '
-        'BtnOK
-        '
-        Me.BtnOK.AutoSizeMode = System.Windows.Forms.AutoSizeMode.GrowAndShrink
-        Me.BtnOK.DialogResult = System.Windows.Forms.DialogResult.OK
-        Me.BtnOK.Location = New System.Drawing.Point(3, 3)
-        Me.BtnOK.Name = "BtnOK"
-        Me.BtnOK.Size = New System.Drawing.Size(90, 23)
-        Me.BtnOK.TabIndex = 0
-        Me.BtnOK.Text = "&OK"
-        Me.BtnOK.UseVisualStyleBackColor = True
+        PanelBottom.Controls.Add(Me.BtnCancel)
+        PanelBottom.Controls.Add(Me.BtnOK)
+        PanelBottom.Dock = System.Windows.Forms.DockStyle.Bottom
+        PanelBottom.FlowDirection = System.Windows.Forms.FlowDirection.RightToLeft
+        PanelBottom.Location = New System.Drawing.Point(0, 66)
+        PanelBottom.Name = "PanelBottom"
+        PanelBottom.Padding = New System.Windows.Forms.Padding(6, 10, 6, 10)
+        PanelBottom.Size = New System.Drawing.Size(315, 43)
+        PanelBottom.TabIndex = 1
+        PanelBottom.WrapContents = False
         '
         'BtnCancel
         '
         Me.BtnCancel.AutoSizeMode = System.Windows.Forms.AutoSizeMode.GrowAndShrink
         Me.BtnCancel.DialogResult = System.Windows.Forms.DialogResult.Cancel
-        Me.BtnCancel.Location = New System.Drawing.Point(99, 3)
+        Me.BtnCancel.Location = New System.Drawing.Point(222, 10)
+        Me.BtnCancel.Margin = New System.Windows.Forms.Padding(6, 0, 6, 0)
         Me.BtnCancel.Name = "BtnCancel"
-        Me.BtnCancel.Size = New System.Drawing.Size(90, 23)
+        Me.BtnCancel.Size = New System.Drawing.Size(75, 23)
         Me.BtnCancel.TabIndex = 1
-        Me.BtnCancel.Text = "&Cancel"
+        Me.BtnCancel.Text = "{&Cancel}"
         Me.BtnCancel.UseVisualStyleBackColor = True
         '
-        'FlowLayoutPanel1
+        'BtnOK
         '
-        FlowLayoutPanel1.AutoSize = True
-        FlowLayoutPanel1.AutoSizeMode = System.Windows.Forms.AutoSizeMode.GrowAndShrink
-        FlowLayoutPanel1.Controls.Add(TableLayoutPanel1)
-        FlowLayoutPanel1.Controls.Add(FlowLayoutPanel2)
-        FlowLayoutPanel1.FlowDirection = System.Windows.Forms.FlowDirection.TopDown
-        FlowLayoutPanel1.Location = New System.Drawing.Point(21, 21)
-        FlowLayoutPanel1.Name = "FlowLayoutPanel1"
-        FlowLayoutPanel1.Size = New System.Drawing.Size(282, 80)
-        FlowLayoutPanel1.TabIndex = 0
+        Me.BtnOK.AutoSizeMode = System.Windows.Forms.AutoSizeMode.GrowAndShrink
+        Me.BtnOK.DialogResult = System.Windows.Forms.DialogResult.OK
+        Me.BtnOK.Location = New System.Drawing.Point(135, 10)
+        Me.BtnOK.Margin = New System.Windows.Forms.Padding(6, 0, 6, 0)
+        Me.BtnOK.Name = "BtnOK"
+        Me.BtnOK.Size = New System.Drawing.Size(75, 23)
+        Me.BtnOK.TabIndex = 0
+        Me.BtnOK.Text = "{&Ok}"
+        Me.BtnOK.UseVisualStyleBackColor = True
+        '
+        'PanelMain
+        '
+        PanelMain.AutoSize = True
+        PanelMain.AutoSizeMode = System.Windows.Forms.AutoSizeMode.GrowAndShrink
+        PanelMain.BackColor = System.Drawing.SystemColors.Window
+        PanelMain.Controls.Add(TableLayoutPanel1)
+        PanelMain.Dock = System.Windows.Forms.DockStyle.Fill
+        PanelMain.Location = New System.Drawing.Point(0, 0)
+        PanelMain.Name = "PanelMain"
+        PanelMain.Padding = New System.Windows.Forms.Padding(18, 18, 18, 6)
+        PanelMain.Size = New System.Drawing.Size(315, 66)
+        PanelMain.TabIndex = 0
         '
         'VolumeSerialNumberForm
         '
         Me.AutoScaleDimensions = New System.Drawing.SizeF(6.0!, 13.0!)
         Me.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font
-        Me.AutoSize = True
-        Me.AutoSizeMode = System.Windows.Forms.AutoSizeMode.GrowAndShrink
-        Me.ClientSize = New System.Drawing.Size(362, 145)
-        Me.Controls.Add(FlowLayoutPanel1)
+        Me.ClientSize = New System.Drawing.Size(315, 109)
+        Me.Controls.Add(PanelMain)
+        Me.Controls.Add(PanelBottom)
         Me.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedDialog
         Me.MaximizeBox = False
         Me.MinimizeBox = False
         Me.Name = "VolumeSerialNumberForm"
-        Me.Padding = New System.Windows.Forms.Padding(18)
         Me.ShowIcon = False
         Me.ShowInTaskbar = False
         Me.StartPosition = System.Windows.Forms.FormStartPosition.CenterParent
-        Me.Text = "Generate Volume Serial Number"
         TableLayoutPanel1.ResumeLayout(False)
         TableLayoutPanel1.PerformLayout()
         CType(Me.NumMS, System.ComponentModel.ISupportInitialize).EndInit()
-        FlowLayoutPanel2.ResumeLayout(False)
-        FlowLayoutPanel1.ResumeLayout(False)
-        FlowLayoutPanel1.PerformLayout()
+        PanelBottom.ResumeLayout(False)
+        PanelMain.ResumeLayout(False)
+        PanelMain.PerformLayout()
         Me.ResumeLayout(False)
         Me.PerformLayout()
 
@@ -206,4 +204,7 @@ Partial Class VolumeSerialNumberForm
     Friend WithEvents DTTime As DateTimePicker
     Friend WithEvents BtnOK As Button
     Friend WithEvents BtnCancel As Button
+    Friend WithEvents LabelDate As Label
+    Friend WithEvents LabelMilliseconds As Label
+    Friend WithEvents LabelTime As Label
 End Class

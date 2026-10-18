@@ -79,66 +79,6 @@
             End Get
         End Property
 
-        Public Function AddFile(FilePath As String, ShortFileName As String, UseCreationDate As Boolean, UseLastAccessDate As Boolean, Optional StartingCluster As UShort = 2) As Boolean
-            Return AddFile(FilePath, ShortFileName, UseCreationDate, UseLastAccessDate, Disk.FAT.FreeClusters, StartingCluster)
-        End Function
-
-        Public Function AddFile(FilePath As String, ShortFileName As String, UseCreationDate As Boolean, UseLastAccessDate As Boolean, ClusterList As SortedSet(Of UShort), Optional StartingCluster As UShort = 2) As Boolean
-            Dim FileInfo = New IO.FileInfo(FilePath)
-            Dim ClusterSize = Disk.BPB.BytesPerCluster
-
-            If FileInfo.Length > ClusterList.Count * ClusterSize Then
-                Return False
-            End If
-
-            Dim UseTransaction As Boolean = _Disk.BeginTransaction
-
-            Dim FirstCluster As UShort = 0
-
-            If FileInfo.Length > 0 Then
-                'Load file into buffer, padding with empty space if needed            
-                Dim FileSize = Math.Ceiling(FileInfo.Length / ClusterSize) * ClusterSize
-                Dim FileBuffer = ReadFileIntoBuffer(FileInfo, FileSize, 0)
-
-                Dim LastCluster As UShort = 0
-
-                For Counter As Integer = 0 To FileBuffer.Length - 1 Step ClusterSize
-                    Dim Cluster = Disk.FAT.GetNextFreeCluster(ClusterList, True, StartingCluster)
-                    If Cluster > 0 Then
-                        If Counter = 0 Then
-                            FirstCluster = Cluster
-                        Else
-                            Disk.FATTables.UpdateTableEntry(LastCluster, Cluster)
-                        End If
-                        Dim ClusterOffset = Disk.BPB.ClusterToOffset(Cluster)
-                        Dim Buffer = Disk.Image.GetBytes(ClusterOffset, ClusterSize)
-                        Array.Copy(FileBuffer, Counter, Buffer, 0, ClusterSize)
-                        Disk.Image.SetBytes(Buffer, ClusterOffset)
-                        LastCluster = Cluster
-                        StartingCluster = Cluster + 1
-                    End If
-                Next
-
-                If LastCluster > 0 Then
-                    Disk.FATTables.UpdateTableEntry(LastCluster, FAT12.FAT_LAST_CLUSTER_END)
-                End If
-            End If
-
-            Dim NewEntry = New DirectoryEntryBase
-            NewEntry.SetFileInfo(FileInfo, ShortFileName, UseCreationDate, UseLastAccessDate)
-            NewEntry.StartingCluster = FirstCluster
-
-            Data = NewEntry.Data
-
-            InitFatChain()
-
-            If UseTransaction Then
-                _Disk.EndTransaction()
-            End If
-
-            Return True
-        End Function
-
         Public Function CanUnDelete() As Boolean
             If FileSize = 0 Or HasInvalidFileSize() Or HasInvalidStartingCluster() Then
                 Return False
@@ -151,7 +91,7 @@
             If IsDirectory Then
                 ClusterCount = 1
             Else
-                ClusterCount = Math.Ceiling(FileSize / _BPB.BytesPerCluster)
+                ClusterCount = CeilDiv(FileSize, _BPB.BytesPerCluster)
             End If
 
             If StartingCluster + ClusterCount - 1 > Size Then
@@ -198,7 +138,7 @@
         End Sub
 
         Public Function GetAllocatedSize() As UInteger
-            Return Math.Ceiling(FileSize / _BPB.BytesPerCluster) * _BPB.BytesPerCluster
+            Return AlignUp(FileSize, _BPB.BytesPerCluster)
         End Function
 
         Public Function GetAllocatedSizeFromFAT() As UInteger
@@ -223,7 +163,7 @@
                     _FloppyImage.CopyTo(Offset, Content, 0, Size)
                 End If
             Else
-                Content = GetDataFromChain(_FloppyImage, ClusterListToSectorList(_BPB, _FatChain.Clusters))
+                Content = GetDataFromChain(_FloppyImage, _BPB, ClusterListToSectorList(_BPB, _FatChain.Clusters))
 
                 If Content.Length <> Size Then
                     Array.Resize(Of Byte)(Content, Size)
@@ -368,7 +308,7 @@
             If IsDirectory Then
                 ClusterCount = 1
             Else
-                ClusterCount = Math.Ceiling(FileSize / _BPB.BytesPerCluster)
+                ClusterCount = CeilDiv(FileSize, _BPB.BytesPerCluster)
             End If
 
             If ClusterCount > 0 Then
@@ -393,8 +333,8 @@
             Return UpdateFile(FilePath, FileSize, FillChar, Disk.FAT.FreeClusters)
         End Function
 
-        Public Function UpdateFile(FilePath As String, FileSize As UInteger, FillChar As Byte, ClusterList As SortedSet(Of UShort))
-            Dim FileInfo = New IO.FileInfo(FilePath)
+        Public Function UpdateFile(FilePath As String, FileSize As UInteger, FillChar As Byte, ClusterList As SortedSet(Of UShort)) As Boolean
+            Dim FileInfo As New IO.FileInfo(FilePath)
             Dim ClusterSize = Disk.BPB.BytesPerCluster
 
             Dim FileLength As Long
@@ -411,7 +351,12 @@
 
             Dim UseTransaction As Boolean = _Disk.BeginTransaction
 
-            'Load file into buffer, padding with empty space if needed            
+
+            'Load file into buffer, padding with empty space if needed
+            'Dim NewFileSize = Math.Ceiling(FileSize / ClusterSize) * ClusterSize
+            'If NewFileSize > Me.FileSize Then
+            '    NewFileSize = Me.FileSize
+            'End If
             Dim FileBuffer = ReadFileIntoBuffer(FileInfo, FileSize, FillChar)
 
             Me.FileSize = FileSize

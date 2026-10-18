@@ -10,8 +10,8 @@ Public Class FilePropertiesFormSingle
 
         _DirectoryEntry = DirectoryEntry
 
-        MyBase.Text = "File Properties"
-        BtnUpdate.Text = "Update"
+        MyBase.Text = WithoutHotkey(My.Resources.Menu_FileProperties)
+        BtnUpdate.Text = My.Resources.Menu_Update
     End Sub
 
     Public ReadOnly Property Updated As Boolean
@@ -20,11 +20,24 @@ Public Class FilePropertiesFormSingle
         End Get
     End Property
 
+    Public Shared Function Display(DirectoryEntry As DirectoryEntry) As Boolean
+        Using dlg As New FilePropertiesFormSingle(DirectoryEntry)
+            dlg.ShowDialog(App.CurrentFormInstance)
+
+            If dlg.DialogResult = DialogResult.OK Then
+                Return dlg.Updated
+            Else
+                Return False
+            End If
+        End Using
+    End Function
+
     Private Sub ApplyUpdate()
         _Updated = False
 
         Dim UseTransaction = _DirectoryEntry.Disk.BeginTransaction
 
+        Dim LFN = _DirectoryEntry.GetLongFileName
         Dim NewDirectoryEntry = _DirectoryEntry.Clone
 
         If RadioFileShort.Checked Then
@@ -45,7 +58,6 @@ Public Class FilePropertiesFormSingle
         End If
 
         If RadioFileShort.Checked Then
-            Dim LFN = _DirectoryEntry.GetLongFileName
             If Not _DirectoryEntry.IsVolumeName And Not _DirectoryEntry.IsDeleted And LFN.Length > 0 Then
                 If _DirectoryEntry.RemoveLFN() Then
                     _Updated = True
@@ -77,7 +89,7 @@ Public Class FilePropertiesFormSingle
         RadioFileShort.Checked = True
 
         If IsVolumeLabel Then
-            Caption = "Volume Label"
+            Caption = My.Resources.Label_VolumeLabel
             Maxlength = 11
             TxtExtension.Visible = False
             MskExtensionHex.Visible = False
@@ -116,9 +128,9 @@ Public Class FilePropertiesFormSingle
             TxtExtension.Text = _DirectoryEntry.GetFileExtension(True)
             MskExtensionHex.SetHex(_DirectoryEntry.Extension)
             If IsDirectory Then
-                Caption = "Directory Name"
+                Caption = My.Resources.Label_DirectoryName
             Else
-                Caption = "File Name"
+                Caption = My.Resources.Label_FileName
             End If
             FlowLayoutFileNameType.Visible = Not Deleted
         End If
@@ -130,7 +142,7 @@ Public Class FilePropertiesFormSingle
         TxtFile.Width = MskFileHex.Width
 
         If Deleted Then
-            Caption &= " (Deleted)"
+            Caption &= " " & InParens(My.Resources.Label_Deleted)
             TxtFile.Mask = "\" & FileName.Substring(0, 1) & Strings.StrDup(Maxlength - 1, "C")
             TxtFile.Text = FileName.Substring(1)
         Else

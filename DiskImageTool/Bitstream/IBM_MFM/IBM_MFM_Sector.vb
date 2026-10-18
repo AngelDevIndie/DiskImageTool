@@ -7,26 +7,30 @@
             Private ReadOnly _IDChecksumValid As Boolean
             Private ReadOnly _InitialDataChecksumValid As Boolean
             Private ReadOnly _Offset As UInteger
+            Private ReadOnly _OffsetEnd As UInteger
             Private _DAMFound As Boolean = False
             Private _Data As Byte()
             Private _DataChecksum As UShort
             Private _DataFieldSync() As Byte
             Private _DataOffset As UInteger
-            Private _Gap2 As Byte()
-            Private _Gap3 As Byte()
             Private _InitialDataChecksum As UShort
             Private _Overlaps As Boolean
 
             Public Sub New(Bitstream As BitArray, Offset As UInteger)
+                Dim NumBytes As UInteger
+
                 _Bitstream = Bitstream
-                _Offset = Offset
-                _IDArea = MFMGetBytes(Bitstream, Offset, 8)
-                _IDChecksum = GetChecksum(Bitstream, Offset + 128)
                 _Overlaps = False
+                _Offset = Offset
 
-                Dim DataOffset = ProcessDataField(Bitstream, Offset + 160)
+                NumBytes = MFM_SYNC_MARK_BYTES + MFM_IDAREA_BYTES
+                _IDArea = MFMGetBytes(Bitstream, Offset, NumBytes)
+                Offset += MFMBytesToBits(NumBytes)
 
-                ProcessGap3(Bitstream, DataOffset)
+                _IDChecksum = GetChecksum(Bitstream, Offset)
+                Offset += MFM_CRC_BITS
+
+                _OffsetEnd = ProcessDataField(Bitstream, Offset)
 
                 _InitialDataChecksumValid = (_DataChecksum = CalculateDataChecksum())
                 _IDChecksumValid = (_IDChecksum = CalculateIDChecksum())
@@ -65,18 +69,6 @@
                 End Get
             End Property
 
-            Public ReadOnly Property Gap2 As Byte()
-                Get
-                    Return _Gap2
-                End Get
-            End Property
-
-            Public ReadOnly Property Gap3 As Byte()
-                Get
-                    Return _Gap3
-                End Get
-            End Property
-
             Public ReadOnly Property IDChecksum As UShort
                 Get
                     Return _IDChecksum
@@ -98,6 +90,12 @@
             Public ReadOnly Property Offset As UInteger
                 Get
                     Return _Offset
+                End Get
+            End Property
+
+            Public ReadOnly Property OffsetEnd As UInteger
+                Get
+                    Return _OffsetEnd
                 End Get
             End Property
 
@@ -150,16 +148,16 @@
                 Return MFMCRC16(_IDArea)
             End Function
 
-            Public Function GetDataBitstream() As BitArray
+            Public Function GetDataBitstream(SeedBit As Boolean) As BitArray
                 Dim DataSize = GetSizeBytes()
-                Dim Buffer(DataSize + 2 - 1) As Byte
+                Dim Buffer(DataSize + MFM_CRC_BYTES - 1) As Byte
 
                 Dim Offset As UInteger = 0
                 Array.Copy(_Data, 0, Buffer, Offset, DataSize)
                 Offset += DataSize
-                Array.Copy(BitConverter.GetBytes(_DataChecksum), 0, Buffer, Offset, 2)
+                Array.Copy(BitConverter.GetBytes(_DataChecksum), 0, Buffer, Offset, MFM_CRC_BYTES)
 
-                Return MFMEncodeBytes(Buffer, 1)
+                Return MFMEncodeBytes(Buffer, SeedBit)
             End Function
 
             Public Function GetSizeBytes() As UInteger
@@ -173,11 +171,22 @@
             Public Sub UpdateBitstream()
                 UpdateChecksum()
 
-                Dim Bitstream = GetDataBitstream()
+                Dim SeedBit = GetSeedBit(_DataOffset)
+
+                Dim Bitstream = GetDataBitstream(SeedBit)
 
                 For i = 0 To Bitstream.Length - 1
                     _Bitstream(_DataOffset + i) = Bitstream(i)
                 Next
+
+                Dim Offset = _DataOffset + Bitstream.Length - 1
+                If Offset < _Bitstream.Length - 2 Then
+                    Dim PrevDataBit = _Bitstream(Offset)
+                    Dim DataBit = _Bitstream(Offset + 2)
+                    Dim ClockBit = (Not DataBit And Not PrevDataBit)
+                    _Bitstream(Offset + 1) = ClockBit
+                End If
+
             End Sub
 
             Public Sub UpdateChecksum()
@@ -185,37 +194,42 @@
             End Sub
 
             Private Function GetChecksum(Bitstream As BitArray, Start As Integer) As UShort
-                Dim Checksum = MFMGetBytes(Bitstream, Start, 2)
+                Dim Checksum = MFMGetBytes(Bitstream, Start, MFM_CRC_BYTES)
 
                 Return BitConverter.ToUInt16(Checksum, 0)
             End Function
 
+            Private Function GetSeedBit(Offset As UInteger) As Boolean
+                If Offset > 0 Then
+                    Return _Bitstream(Offset - 1)
+                Else
+                    Return True
+                End If
+            End Function
             Private Function ProcessDataField(BitStream As BitArray, Start As UInteger) As Integer
-                Dim MFMPattern = BytesToBits(MFM_Sync_Bytes)
+                Dim MFMPattern = BytesToBits(MFM_SYNC_PATTERN_BYTES)
 
                 _DAMFound = False
                 Dim DataFieldSyncIndex = FindPattern(BitStream, MFMPattern, Start)
                 If DataFieldSyncIndex > -1 Then
-                    Dim DAM As MFMAddressMark = MFMGetByte(BitStream, DataFieldSyncIndex + 3 * MFM_BYTE_SIZE)
+                    Dim DAM As MFMAddressMark = MFMGetByte(BitStream, DataFieldSyncIndex + MFM_SYNC_BITS)
                     If DAM = MFMAddressMark.Data Or DAM = MFMAddressMark.DeletedData Then
                         _DAMFound = True
                     End If
                 End If
 
                 If _DAMFound Then
-                    _DataFieldSync = MFMGetBytes(BitStream, DataFieldSyncIndex, 4)
+                    _DataFieldSync = MFMGetBytes(BitStream, DataFieldSyncIndex, MFM_SYNC_MARK_BYTES)
                     Dim Size = GetSizeBytes()
-                    _Gap2 = MFMGetBytesByRange(BitStream, Start, DataFieldSyncIndex - MFM_SYNC_SIZE_BITS)
-                    _DataOffset = DataFieldSyncIndex + MFMPattern.Length + MFM_BYTE_SIZE
+                    _DataOffset = DataFieldSyncIndex + MFMPattern.Length + MFM_BYTE_BITS
                     _Data = MFMGetBytes(BitStream, _DataOffset, Size)
-                    Start = _DataOffset + Size * MFM_BYTE_SIZE
+                    Start = _DataOffset + MFMBytesToBits(Size)
                     Start = Start Mod BitStream.Length
                     _DataChecksum = GetChecksum(BitStream, Start)
                     _InitialDataChecksum = _DataChecksum
-                    Start += 2 * MFM_BYTE_SIZE
+                    Start += MFM_CRC_BITS
                 Else
-                    _DataFieldSync = New Byte(3) {}
-                    _Gap2 = New Byte(-1) {}
+                    _DataFieldSync = New Byte(MFM_SYNC_MARK_BYTES - 1) {}
                     _DataOffset = 0
                     _Data = New Byte(-1) {}
                     _DataChecksum = 0
@@ -223,19 +237,6 @@
 
                 Return Start
             End Function
-
-            Private Sub ProcessGap3(Bitstream As BitArray, Offset As UInteger)
-                Dim IDAMPattern = BytesToBits(MFM_IDAM_Sync_Bytes)
-
-                Dim IDAMFieldSyncIndex = FindPattern(Bitstream, IDAMPattern, Offset)
-                If IDAMFieldSyncIndex = -1 Then
-                    IDAMFieldSyncIndex = Bitstream.Length
-                Else
-                    IDAMFieldSyncIndex -= MFM_SYNC_SIZE_BITS
-                End If
-
-                _Gap3 = MFMGetBytesByRange(Bitstream, Offset, IDAMFieldSyncIndex)
-            End Sub
         End Class
     End Namespace
 End Namespace

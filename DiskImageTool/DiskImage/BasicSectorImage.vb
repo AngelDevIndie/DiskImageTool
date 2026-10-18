@@ -3,7 +3,6 @@
         Implements IFloppyImage
 
         Private _Data() As Byte
-        Private ReadOnly _ProtectedSectors As HashSet(Of UInteger)
         Private ReadOnly _AdditionalTracks As HashSet(Of UShort)
         Private ReadOnly _NonStandardTracks As HashSet(Of UShort)
         Private ReadOnly _History As ImageHistory
@@ -11,7 +10,6 @@
         Sub New(Data() As Byte)
             _Data = Data
             _History = New ImageHistory(Me)
-            _ProtectedSectors = New HashSet(Of UInteger)
             _AdditionalTracks = New HashSet(Of UShort)
             _NonStandardTracks = New HashSet(Of UShort)
         End Sub
@@ -19,6 +17,12 @@
         Public ReadOnly Property BitstreamImage As Bitstream.IBitstreamImage Implements IFloppyImage.BitstreamImage
             Get
                 Return Nothing
+            End Get
+        End Property
+
+        Public ReadOnly Property BytesPerSector As UInteger Implements IFloppyImage.BytesPerSector
+            Get
+                Return 512
             End Get
         End Property
 
@@ -250,6 +254,10 @@
             Return True
         End Function
 
+        Public Function SetTrackBitstream(Track As UShort, Side As Byte, Bitstream As BitArray) As Boolean Implements IFloppyImage.SetTrackBitstream
+            Return False
+        End Function
+
         Private ReadOnly Property IFloppyImage_AdditionalTracks As HashSet(Of UShort) Implements IFloppyImage.AdditionalTracks
             Get
                 Return _AdditionalTracks
@@ -259,12 +267,6 @@
         Private ReadOnly Property IFloppyImage_NonStandardTracks As HashSet(Of UShort) Implements IFloppyImage.NonStandardTracks
             Get
                 Return _NonStandardTracks
-            End Get
-        End Property
-
-        Private ReadOnly Property IFloppyImage_ProtectedSectors As HashSet(Of UInteger) Implements IFloppyImage.ProtectedSectors
-            Get
-                Return _ProtectedSectors
             End Get
         End Property
 
@@ -279,5 +281,13 @@
                 Return 0
             End Get
         End Property
+
+        Private Function IFloppyImage_IsProtectedSector(Sector As UInteger) As Boolean Implements IFloppyImage.IsProtectedSector
+            Return False
+        End Function
+
+        Private Function IFloppyImage_IsTranslatedSector(Sector As UInteger) As Boolean Implements IFloppyImage.IsTranslatedSector
+            Return False
+        End Function
     End Class
 End Namespace

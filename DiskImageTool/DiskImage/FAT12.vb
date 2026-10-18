@@ -43,8 +43,8 @@
         Public Sub InitializeFAT(BPB As BiosParameterBlock)
             _BPB = BPB
             If BPB.IsValid Then
-                _Offset = (BPB.FATRegionStart + (BPB.SectorsPerFAT * _Index)) * Disk.BYTES_PER_SECTOR
-                _Size = BPB.SectorsPerFAT * Disk.BYTES_PER_SECTOR
+                _Offset = (BPB.FATRegionStart + (BPB.SectorsPerFAT * _Index)) * BPB.BytesPerSector
+                _Size = BPB.SectorsPerFAT * BPB.BytesPerSector
                 _Entries = BPB.NumberOfFATEntries + 2
                 _BytesPerCluster = BPB.BytesPerCluster
 
@@ -153,13 +153,13 @@
         End Function
 
         Public Function GetFreeClusters(FreeClusterType As FreeClusterEmum) As SortedSet(Of UShort)
-            Dim ClusterList = New SortedSet(Of UShort)
+            Dim ClusterList As New SortedSet(Of UShort)
             For Each Cluster In _FreeClusters
                 Dim ProtectedCluster As Boolean = False
 
                 Dim SectorList = ClusterToSectorList(_BPB, Cluster)
                 For Each Sector In SectorList
-                    If _FloppyImage.ProtectedSectors.Contains(Sector) Then
+                    If _FloppyImage.IsProtectedSector(Sector) Then
                         ProtectedCluster = True
                         Exit For
                     End If
@@ -221,7 +221,7 @@
 
                 Dim SectorList = ClusterToSectorList(_BPB, Cluster)
                 For Each Sector In SectorList
-                    If _FloppyImage.ProtectedSectors.Contains(Sector) Then
+                    If _FloppyImage.IsProtectedSector(Sector) Then
                         ProtectedCluster = True
                         Exit For
                     End If
@@ -290,7 +290,7 @@
         End Function
 
         Public Shared Function EncodeFAT12(FATTable() As UShort) As Byte()
-            Dim Size As Integer = Math.Ceiling(FATTable.Length / 2 * 3)
+            Dim Size As Integer = CeilDiv(CUInt(FATTable.Length * 3), 2)
 
             Dim FatBytes(Size - 1) As Byte
 
@@ -342,7 +342,7 @@
 
             Dim Data = _FloppyImage.GetBytes(Offset, ClusterSize)
             Dim EmptyByte As Byte = Data(0)
-            If EmptyByte <> &HF6 And EmptyByte <> &H0 Then
+            If Not Disk.FreeClusterBytes.Contains(EmptyByte) Then
                 Return False
             Else
                 For Each B In Data

@@ -1,135 +1,119 @@
-﻿Namespace DiskImage
+﻿Imports System.Runtime.CompilerServices
+
+Namespace DiskImage
     Module EnumDescriptions
-        Public Function BootSectorDescription(Offset As BootSector.BootSectorOffsets) As String
+
+        <Extension()>
+        Public Function GetDescription(Offset As BootSector.BootSectorOffsets) As String
             Select Case Offset
                 Case BootSector.BootSectorOffsets.JmpBoot
-                    Return "Bootstrap Jump"
+                    Return My.Resources.BootSector_JmpBoot
                 Case BootSector.BootSectorOffsets.OEMName
-                    Return "OEM Name"
+                    Return My.Resources.Label_OEMName
                 Case BootSector.BootSectorOffsets.DriveNumber
-                    Return "Drive Number"
+                    Return My.Resources.Label_DriveNumber
                 Case BootSector.BootSectorOffsets.Reserved
-                    Return "Reserved"
+                    Return My.Resources.Label_Reserved
                 Case BootSector.BootSectorOffsets.ExtendedBootSignature
-                    Return "Extended Boot Signature"
+                    Return My.Resources.Label_ExtendedBootSignature
                 Case BootSector.BootSectorOffsets.VolumeSerialNumber
-                    Return "Volume Serial Number"
+                    Return My.Resources.Label_VolumeSerialNumber
                 Case BootSector.BootSectorOffsets.VolumeLabel
-                    Return "Volume Label"
+                    Return My.Resources.Label_VolumeLabel
                 Case BootSector.BootSectorOffsets.FileSystemType
-                    Return "File System ID"
+                    Return My.Resources.Label_FileSystemType
                 Case BootSector.BootSectorOffsets.BootStrapSignature
-                    Return "Boot Sector Signature"
+                    Return My.Resources.Label_BootStrapSignature
                 Case Else
                     Return Offset.ToString
             End Select
         End Function
 
-        Public Function BPBDescription(Offset As BiosParameterBlock.BPBOoffsets) As String
+        <Extension()>
+        Public Function GetDescription(Offset As BiosParameterBlock.BPBOoffsets) As String
             Select Case Offset
                 Case BiosParameterBlock.BPBOoffsets.BytesPerSector
-                    Return "Bytes per Sector"
+                    Return My.Resources.Label_BytesPerSector
                 Case BiosParameterBlock.BPBOoffsets.SectorsPerCluster
-                    Return "Sectors per Cluster"
+                    Return My.Resources.Label_SectorsPerCluster
                 Case BiosParameterBlock.BPBOoffsets.ReservedSectorCount
-                    Return "Reserved Sectors"
+                    Return My.Resources.Label_ReservedSectorCount
                 Case BiosParameterBlock.BPBOoffsets.NumberOfFATs
-                    Return "Number of FATs"
+                    Return My.Resources.Label_NumberOfFATs
                 Case BiosParameterBlock.BPBOoffsets.RootEntryCount
-                    Return "Root Directory Entries"
+                    Return My.Resources.Label_RootEntryCount
                 Case BiosParameterBlock.BPBOoffsets.SectorCountSmall
-                    Return "Total Sector Count"
+                    Return My.Resources.Label_SectorCountSmall
                 Case BiosParameterBlock.BPBOoffsets.MediaDescriptor
-                    Return "Media Descriptor"
+                    Return My.Resources.Label_MediaDescriptor
                 Case BiosParameterBlock.BPBOoffsets.SectorsPerFAT
-                    Return "Sectors per FAT"
+                    Return My.Resources.Label_SectorsPerFAT
                 Case BiosParameterBlock.BPBOoffsets.SectorsPerTrack
-                    Return "Sectors per Track"
+                    Return My.Resources.Label_SectorsPerTrack
                 Case BiosParameterBlock.BPBOoffsets.NumberOfHeads
-                    Return "Number of Heads"
+                    Return My.Resources.Label_NumberOfHeads
                 Case BiosParameterBlock.BPBOoffsets.HiddenSectors
-                    Return "Hidden Sectors"
+                    Return My.Resources.Label_HiddenSectors
                 Case Else
                     Return Offset.ToString
             End Select
         End Function
 
-        Public Function DirectorytEntryDescription(Offset As DirectoryEntry.DirectoryEntryOffsets) As String
+        <Extension()>
+        Public Function GetDescription(Offset As DirectoryEntry.DirectoryEntryOffsets) As String
             Select Case Offset
                 Case DirectoryEntry.DirectoryEntryOffsets.FileName
-                    Return "Name"
+                    Return My.Resources.Label_Name
                 Case DirectoryEntry.DirectoryEntryOffsets.Extension
-                    Return "Extension"
+                    Return My.Resources.DirectoryEntry_Extension
                 Case DirectoryEntry.DirectoryEntryOffsets.Attributes
-                    Return "Attributes"
+                    Return My.Resources.Label_Attributes
                 Case DirectoryEntry.DirectoryEntryOffsets.ReservedForWinNT
-                    Return "Reserved For Windows NT"
+                    Return My.Resources.DirectoryEntry_ReservedForWinNT
                 Case DirectoryEntry.DirectoryEntryOffsets.CreationMillisecond
-                    Return "Creation Time Tenths"
+                    Return My.Resources.DirectoryEntry_CreationMillisecond
                 Case DirectoryEntry.DirectoryEntryOffsets.CreationTime
-                    Return "Creation Time"
+                    Return My.Resources.DirectoryEntry_CreationTime
                 Case DirectoryEntry.DirectoryEntryOffsets.CreationDate
-                    Return "Creation Date"
+                    Return My.Resources.DirectoryEntry_CreationDate
                 Case DirectoryEntry.DirectoryEntryOffsets.LastAccessDate
-                    Return "Last Access Date"
+                    Return My.Resources.DirectoryEntry_LastAccessDate
                 Case DirectoryEntry.DirectoryEntryOffsets.ReservedForFAT32
-                    Return "Reserved for FAT 32"
+                    Return My.Resources.DirectoryEntry_ReservedForFAT32
                 Case DirectoryEntry.DirectoryEntryOffsets.LastWriteTime
-                    Return "Last Write Time"
+                    Return My.Resources.DirectoryEntry_LastWriteTime
                 Case DirectoryEntry.DirectoryEntryOffsets.LastWriteDate
-                    Return "Last Write Date"
+                    Return My.Resources.DirectoryEntry_LastWriteDate
                 Case DirectoryEntry.DirectoryEntryOffsets.StartingCluster
-                    Return "Starting Cluster"
+                    Return My.Resources.DirectoryEntry_StartingCluster
                 Case DirectoryEntry.DirectoryEntryOffsets.FileSize
-                    Return "Size"
+                    Return My.Resources.Label_Size
                 Case Else
                     Return Offset.ToString
             End Select
         End Function
 
-        Public Function DirectorytEntryLFNDescription(Offset As DirectoryEntry.LFNOffsets) As String
+        <Extension()>
+        Public Function GetDescription(Offset As DirectoryEntry.LFNOffsets) As String
             Select Case Offset
                 Case DirectoryEntry.LFNOffsets.Sequence
-                    Return "LFN Sequence"
+                    Return My.Resources.DirectoryEntryLFN_Sequence
                 Case DirectoryEntry.LFNOffsets.FilePart1
-                    Return "LFN Name 1"
+                    Return String.Format(My.Resources.DirectoryEntryLFN_FilePart, "1")
                 Case DirectoryEntry.LFNOffsets.Attributes
-                    Return "LFN Attributes"
+                    Return My.Resources.DirectoryEntryLFN_Attributes
                 Case DirectoryEntry.LFNOffsets.Type
-                    Return "LFN Type"
+                    Return My.Resources.DirectoryEntryLFN_Type
                 Case DirectoryEntry.LFNOffsets.Checksum
-                    Return "LFN Checksum"
+                    Return My.Resources.DirectoryEntryLFN_Checksum
                 Case DirectoryEntry.LFNOffsets.FilePart2
-                    Return "LFN Name 2"
+                    Return String.Format(My.Resources.DirectoryEntryLFN_FilePart, "2")
                 Case DirectoryEntry.LFNOffsets.StartingCluster
-                    Return "LFN Starting Cluster"
+                    Return My.Resources.DirectoryEntryLFN_StartingCluster
                 Case DirectoryEntry.LFNOffsets.FilePart3
-                    Return "LFN Name 3"
+                    Return String.Format(My.Resources.DirectoryEntryLFN_FilePart, "3")
                 Case Else
                     Return Offset.ToString
-            End Select
-        End Function
-
-        Public Function GetImageTypeName(ImageType As FloppyImageType) As String
-            Select Case ImageType
-                Case FloppyImageType.BasicSectorImage
-                    Return "Basic Sector Image"
-                Case FloppyImageType.HFEImage
-                    Return "HxC HFE Image"
-                Case FloppyImageType.MFMImage
-                    Return "HxC MFM Image"
-                Case FloppyImageType.PSIImage
-                    Return "PCE Sector Image"
-                Case FloppyImageType.PRIImage
-                    Return "PCE Bitstream Image"
-                Case FloppyImageType.TranscopyImage
-                    Return "Transcopy Image"
-                Case FloppyImageType.D86FImage
-                    Return "86Box 86F Image"
-                Case FloppyImageType.IMDImage
-                    Return "ImageDisk Sector Image"
-                Case Else
-                    Return "Unknown"
             End Select
         End Function
     End Module

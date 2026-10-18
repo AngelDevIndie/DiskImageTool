@@ -4,7 +4,7 @@ Imports System.Text
 
 Module DebugScript
 
-    Public Sub GenerateDebugPackage(CurrentImage As CurrentImage)
+    Public Sub GenerateDebugPackage(CurrentImage As DiskImageContainer)
         Dim TempPath As String = Path.GetTempPath() & Guid.NewGuid().ToString()
         Dim ContentPath As String = Path.Combine(TempPath, "CONTENT")
         Dim ToolsPath As String = Path.Combine(ContentPath, "TOOLS")
@@ -23,13 +23,14 @@ Module DebugScript
 
         ZipContent(ZipPath, ContentPath)
 
-        Dim Dialog = New SaveFileDialog With {
+        Using Dialog As New SaveFileDialog With {
             .FileName = Path.GetFileName(ZipPath),
             .Filter = "Zip Archive (*.zip)|*.zip"
         }
-        If Dialog.ShowDialog = DialogResult.OK Then
-            File.Copy(ZipPath, Dialog.FileName, True)
-        End If
+            If Dialog.ShowDialog = DialogResult.OK Then
+                File.Copy(ZipPath, Dialog.FileName, True)
+            End If
+        End Using
 
         Directory.Delete(TempPath, True)
     End Sub
@@ -43,8 +44,8 @@ Module DebugScript
         Dim DriveAFile As String = Path.Combine(DataPath, "DRIVE0.TXT")
         Dim DriveBFile As String = Path.Combine(DataPath, "DRIVE1.TXT")
 
-        Dim SB_A = New StringBuilder()
-        Dim SB_B = New StringBuilder()
+        Dim SB_A As New StringBuilder()
+        Dim SB_B As New StringBuilder()
 
         For Each Offset As UInteger In Modifications.Keys
             ScriptModifications.Item(Offset) = Modifications.Item(Offset)
@@ -58,7 +59,7 @@ Module DebugScript
         Array.Sort(OffsetArray)
 
         For Each Offset As UInteger In OffsetArray
-            Dim Sector As UInteger = DiskImage.Disk.OffsetToSector(Offset)
+            Dim Sector As UInteger = Disk.BPB.OffsetToSector(Offset)
 
             If SectorDict.ContainsKey(Sector) Then
                 SegmentList = SectorDict.Item(Sector)
@@ -67,7 +68,7 @@ Module DebugScript
                 SectorDict.Add(Sector, SegmentList)
             End If
 
-            Dim SectorOffset As UInteger = DiskImage.Disk.SectorToBytes(Sector)
+            Dim SectorOffset As UInteger = Disk.BPB.SectorToBytes(Sector)
             Dim Value = ScriptModifications.Item(Offset)
             SegmentList.Add(GetSegment(Offset - SectorOffset, Value))
         Next
@@ -77,7 +78,7 @@ Module DebugScript
             SB_B.AppendLine(DebugLoad(0, 1, Sector, 1))
             SegmentList = SectorDict.Item(Sector)
             For Each Segment In SegmentList
-                For I = 0 To Math.Ceiling(Segment.Data.Length / ByteLenPerLine) - 1
+                For I = 0 To CeilDiv(CUInt(Segment.Data.Length), ByteLenPerLine) - 1
                     Dim SourceIndex As Integer = I * ByteLenPerLine
                     Dim SegmentOffset As Integer = Segment.Offset + SourceIndex
                     Dim Length As Integer = Math.Min(ByteLenPerLine, Segment.Data.Length - SourceIndex)
@@ -97,17 +98,17 @@ Module DebugScript
         File.WriteAllText(DriveBFile, SB_B.ToString)
     End Sub
 
-    Public Sub GenerateDirectoryDump(DataPath As String, CurrentImage As CurrentImage)
+    Public Sub GenerateDirectoryDump(DataPath As String, CurrentImage As DiskImageContainer)
         Dim FileName As String
 
         Dim SectorStart = CurrentImage.Disk.BootSector.BPB.RootDirectoryRegionStart
         Dim SectorEnd = CurrentImage.Disk.BootSector.BPB.DataRegionStart
-        Dim Length = DiskImage.Disk.SectorToBytes(SectorEnd - SectorStart)
+        Dim Length = CurrentImage.Disk.BootSector.BPB.SectorToBytes(SectorEnd - SectorStart)
         Dim Offset As UInteger = 256
 
         For Index = 0 To 1
             FileName = Path.Combine(DataPath, "DIRDUMP" & Index & ".TXT")
-            Dim SB = New StringBuilder()
+            Dim SB As New StringBuilder()
 
             SB.AppendLine("N ROOTDIR.TMP")
             SB.AppendLine(DebugLoad(Offset, Index, SectorStart, SectorEnd - SectorStart))

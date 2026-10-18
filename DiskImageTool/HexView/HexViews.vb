@@ -11,34 +11,144 @@ Module HexViews
         Return DisplayHexViewForm(HexViewSectorData, False, False, SyncBlocks)
     End Function
 
-    Public Function DisplayHexViewForm(HexViewSectorData As HexViewSectorData, SectorNavigator As Boolean, ClusterNavigator As Boolean, SyncBlocks As Boolean) As Boolean
-        If HexViewSectorData.SectorData.BlockCount > 0 Then
-            Dim frmHexView As New HexViewForm(HexViewSectorData, SectorNavigator, ClusterNavigator, SyncBlocks)
-            frmHexView.ShowDialog()
+    Public Function DisplayHexViewForm(HexViewSectorData As HexViewSectorData,
+                                       SectorNavigator As Boolean,
+                                       ClusterNavigator As Boolean,
+                                       SyncBlocks As Boolean) As Boolean
 
-            Return frmHexView.Modified
+        If HexViewSectorData.SectorData.BlockCount > 0 Then
+            Return HexViewForm.Display(HexViewSectorData, SectorNavigator, ClusterNavigator, SyncBlocks, Nothing)
         Else
-            MsgBox("No Data Available at this location. Check the image size.", MsgBoxStyle.Exclamation)
+            MsgBox(My.Resources.Dialog_CheckImageSize, MsgBoxStyle.Exclamation)
             Return False
         End If
     End Function
 
-    Public Function DisplayHexViewForm(HexViewSectorData As HexViewSectorData, SectorNavigator As Boolean, ClusterNavigator As Boolean, SyncBlocks As Boolean, Cluster As UShort) As Boolean
-        If HexViewSectorData.SectorData.BlockCount > 0 Then
-            Dim frmHexView As New HexViewForm(HexViewSectorData, SectorNavigator, ClusterNavigator, SyncBlocks)
-            frmHexView.SetStartingCluster(Cluster)
-            frmHexView.ShowDialog()
+    Public Function DisplayHexViewForm(HexViewSectorData As HexViewSectorData,
+                                       SectorNavigator As Boolean,
+                                       ClusterNavigator As Boolean,
+                                       SyncBlocks As Boolean,
+                                       Cluster As UShort) As Boolean
 
-            Return frmHexView.Modified
+        If HexViewSectorData.SectorData.BlockCount > 0 Then
+            Return HexViewForm.Display(HexViewSectorData, SectorNavigator, ClusterNavigator, SyncBlocks, Cluster)
         Else
-            MsgBox("No Data Available at this location. Check the image size.", MsgBoxStyle.Exclamation)
+            MsgBox(My.Resources.Dialog_CheckImageSize, MsgBoxStyle.Exclamation)
             Return False
         End If
+    End Function
+
+    Public Function HexDisplayBadSectors(Disk As Disk) As Boolean
+        Dim HexViewSectorData = HexViewBadSectors(Disk)
+
+        Return DisplayHexViewForm(HexViewSectorData)
+    End Function
+
+    Public Function HexDisplayBootSector(Disk As Disk) As Boolean
+        Dim HexViewSectorData = HexViewBootSector(Disk)
+
+        Return DisplayHexViewForm(HexViewSectorData)
+    End Function
+
+    Public Function HexDisplayDirectory(Disk As Disk, Directory As IDirectory) As Boolean
+        Dim Result As Boolean
+
+        If Directory Is Disk.RootDirectory Then
+            Result = HexDisplayRootDirectory(Disk)
+        Else
+            Result = HexDisplayDirectoryEntry(Disk, Directory.ParentEntry)
+        End If
+
+        Return Result
+    End Function
+
+    Public Function HexDisplayDirectoryEntry(Disk As Disk, DirectoryEntry As DirectoryEntry) As Boolean
+        Dim HexViewSectorData = HexViewDirectoryEntry(Disk, DirectoryEntry)
+
+        If HexViewSectorData Is Nothing Then
+            Return False
+        End If
+
+        Return DisplayHexViewForm(HexViewSectorData)
+    End Function
+
+    Public Function HexDisplayDisk(Disk As Disk) As Boolean
+        Dim HexViewSectorData As New HexViewSectorData(Disk, 0, Disk.Image.Length) With {
+            .Description = "Disk"
+        }
+
+        Return DisplayHexViewForm(HexViewSectorData, True, True, False)
+    End Function
+
+    Public Function HexDisplayFAT(Disk As Disk) As Boolean
+        Dim HexViewSectorData = HexViewFAT(Disk)
+
+        Dim SyncBlocks = Disk.BPB.NumberOfFATEntries > 1 AndAlso Not Disk.DiskParams.IsXDF
+
+        Return DisplayHexViewForm(HexViewSectorData, SyncBlocks)
+    End Function
+
+    Public Function HexDisplayFreeClusters(Disk As Disk) As Boolean
+        Dim HexViewSectorData As New HexViewSectorData(Disk, Disk.FAT.GetFreeClusters(FAT12.FreeClusterEmum.WithData).ToList) With {
+            .Description = "Free Clusters"
+        }
+
+        Return DisplayHexViewForm(HexViewSectorData)
+    End Function
+
+    Public Function HexDisplayLostSectors(Disk As Disk) As Boolean
+        Dim HexViewSectorData = HexViewLostClusters(Disk)
+
+        Return DisplayHexViewForm(HexViewSectorData)
+    End Function
+
+    Public Function HexDisplayOverdumpData(Disk As Disk) As Boolean
+        Dim Offset = Disk.BPB.ReportedImageSize() + 1
+
+        Dim HexViewSectorData As New HexViewSectorData(Disk, Offset, Disk.Image.Length - Offset) With {
+            .Description = "Disk"
+        }
+
+        Return DisplayHexViewForm(HexViewSectorData, True, True, False)
+    End Function
+
+    Public Function HexDisplayRawTrackData(Disk As Disk, TrackIndex As Integer) As Boolean
+        Dim Track As UShort
+        Dim Side As Byte
+        Dim AllTracks As Boolean
+
+        If TrackIndex = -1 Then
+            Track = 0
+            Side = 0
+            AllTracks = True
+        Else
+            Track = TrackIndex \ Disk.Image.SideCount
+            Side = TrackIndex Mod Disk.Image.SideCount
+            AllTracks = False
+        End If
+
+        Dim Image = Disk.Image.BitstreamImage
+
+        If Image IsNot Nothing Then
+            Return HexViewRawForm.Display(Disk, Track, Side, AllTracks)
+        End If
+
+        Return False
+    End Function
+
+    Public Function HexDisplayRootDirectory(Disk As Disk) As Boolean
+        Dim HexViewSectorData = HexViewRootDirectory(Disk)
+
+        If HexViewSectorData Is Nothing Then
+            Return False
+        End If
+
+        Return DisplayHexViewForm(HexViewSectorData)
     End Function
 
     Public Function HexViewBadSectors(Disk As Disk) As HexViewSectorData
         Dim HexViewSectorData As New HexViewSectorData(Disk) With {
-            .Description = "Bad Sectors"
+            .Description = My.Resources.Label_BadSectors
         }
 
         Dim Offset As UInteger = 0
@@ -64,37 +174,9 @@ Module HexViews
         Return HexViewSectorData
     End Function
 
-    Public Function HexViewLostClusters(Disk As Disk) As HexViewSectorData
-        Dim HexViewSectorData As New HexViewSectorData(Disk) With {
-            .Description = "Lost Clusters"
-        }
-
-        Dim Offset As UInteger = 0
-        Dim Length As UInteger = 0
-        Dim LastCluster As UShort = 0
-
-        For Each Cluster In Disk.RootDirectory.FATAllocation.LostClusters
-            If Cluster > LastCluster + 1 Then
-                If Length > 0 Then
-                    HexViewSectorData.SectorData.AddBlockByOffset(Offset, Length)
-                End If
-                Offset = Disk.BPB.ClusterToOffset(Cluster)
-                Length = 0
-            End If
-            Length += Disk.BPB.BytesPerCluster
-            LastCluster = Cluster
-        Next
-
-        If Length > 0 Then
-            HexViewSectorData.SectorData.AddBlockByOffset(Offset, Length)
-        End If
-
-        Return HexViewSectorData
-    End Function
-
     Public Function HexViewBootSector(Disk As Disk) As HexViewSectorData
         Dim HexViewSectorData As New HexViewSectorData(Disk) With {
-            .Description = "Boot Sector"
+            .Description = My.Resources.Label_BootSector
         }
 
         Dim HighlightedRegions As New HighlightedRegions
@@ -112,11 +194,11 @@ Module HexViews
             ForeColor = Color.Black
         End If
 
-        HighlightedRegions.AddBootSectorOffset(BootSectorOffsets.JmpBoot, ForeColor)
+        HighlightedRegions.AddBootSectorOffset(BootSectorOffsets.JmpBoot.GetDescription(), Disk.BootSector.GetJmpBootOffset, BootSectorSizes.JmpBoot, ForeColor)
         If Disk.IsValidImage Then
             If Disk.BootSector.CheckJumpInstruction(False) AndAlso Disk.BootSector.BPB.IsValid Then
-                If BootStrapStart < 3 Or BootStrapStart >= BootSectorOffsets.OEMName + BootSectorSizes.OEMName Then
-                    HighlightedRegions.AddBootSectorOffset(BootSectorOffsets.OEMName, Color.Red)
+                If BootStrapStart < 3 Or BootStrapStart >= Disk.BootSector.GetOEMNameOffset + Disk.BootSector.GetOEMNameSize Then
+                    HighlightedRegions.AddBootSectorOffset(BootSectorOffsets.OEMName.GetDescription(), Disk.BootSector.GetOEMNameOffset, Disk.BootSector.GetOEMNameSize, Color.Red)
                 End If
                 If BootStrapStart < 3 Or BootStrapStart >= BPBOoffsets.HiddenSectors + BPBSizes.HiddenSectors Then
                     HighlightedRegions.AddBPBoffset(BPBOoffsets.BytesPerSector, Color.Blue)
@@ -162,15 +244,6 @@ Module HexViews
         Return HexViewSectorData
     End Function
 
-    Public Function HexViewRootDirectory(Disk As Disk) As HexViewSectorData
-        Dim HexViewSectorData = New HexViewSectorData(Disk, Disk.RootDirectory.SectorChain)
-        HighlightDirectoryData(Disk, HexViewSectorData, True)
-
-        HexViewSectorData.Description = "Root Directory"
-
-        Return HexViewSectorData
-    End Function
-
     Public Function HexViewDirectoryEntry(Disk As Disk, DirectoryEntry As DirectoryEntry) As HexViewSectorData
         Dim HexViewSectorData As HexViewSectorData
         Dim Caption As String
@@ -179,10 +252,23 @@ Module HexViews
             Return Nothing
         End If
 
-        Caption = IIf(DirectoryEntry.IsDirectory, "Directory", "File") & " - " & DirectoryEntry.GetShortFileName(True)
+        If DirectoryEntry.IsDirectory Then
+            If DirectoryEntry.IsDeleted Then
+                Caption = My.Resources.HexView_DeletedDirectory
+            Else
+                Caption = My.Resources.Label_Directory
+            End If
+        Else
+            If DirectoryEntry.IsDeleted Then
+                Caption = My.Resources.HexView_DeletedFile
+            Else
+                Caption = My.Resources.Label_File
+            End If
+        End If
+
+        Caption &= " - " & DirectoryEntry.GetShortFileName(True)
 
         If DirectoryEntry.IsDeleted Then
-            Caption = "Deleted " & Caption
             Dim DataOffset = Disk.BPB.ClusterToOffset(DirectoryEntry.StartingCluster)
             Dim Length As UInteger
             Dim FileSize As UInteger
@@ -190,7 +276,7 @@ Module HexViews
                 Length = Disk.BPB.BytesPerCluster
                 FileSize = Length
             Else
-                Length = Math.Ceiling(DirectoryEntry.FileSize / Disk.BPB.BytesPerCluster) * Disk.BPB.BytesPerCluster
+                Length = AlignUp(DirectoryEntry.FileSize, Disk.BPB.BytesPerCluster)
                 FileSize = DirectoryEntry.FileSize
             End If
 
@@ -211,23 +297,23 @@ Module HexViews
     End Function
 
     Public Function HexViewFAT(Disk As Disk) As HexViewSectorData
-        Dim HexViewSectorData = New HexViewSectorData(Disk) With {
-            .Description = "File Allocation Table"
+        Dim HexViewSectorData As New HexViewSectorData(Disk) With {
+            .Description = My.Resources.Label_FAT
         }
 
         Dim HighlightedRegions As New HighlightedRegions
         Dim OriginalData() As Byte = Nothing
 
         Dim NumberOfFATs As Byte
-        If IsDiskFormatXDF(Disk.DiskFormat) Then
+        If Disk.DiskParams.IsXDF Then
             NumberOfFATs = 1
         Else
             NumberOfFATs = Disk.BPB.NumberOfFATs
         End If
 
         For Index As Byte = 0 To NumberOfFATs - 1
-            Dim Length As UInteger = Disk.SectorToBytes(Disk.BPB.SectorsPerFAT)
-            Dim Start As UInteger = Disk.SectorToBytes(Disk.BPB.FATRegionStart) + Length * Index
+            Dim Length As UInteger = Disk.BPB.SectorToBytes(Disk.BPB.SectorsPerFAT)
+            Dim Start As UInteger = Disk.BPB.SectorToBytes(Disk.BPB.FATRegionStart) + Length * Index
             Dim Data = Disk.Image.GetBytes(Start, Length)
 
             HexViewSectorData.SectorData.AddBlockByOffset(Start, Length, "FAT " & Index + 1)
@@ -260,6 +346,41 @@ Module HexViews
         Return HexViewSectorData
     End Function
 
+    Public Function HexViewLostClusters(Disk As Disk) As HexViewSectorData
+        Dim HexViewSectorData As New HexViewSectorData(Disk) With {
+            .Description = My.Resources.Label_LostClusters
+        }
+
+        Dim Offset As UInteger = 0
+        Dim Length As UInteger = 0
+        Dim LastCluster As UShort = 0
+
+        For Each Cluster In Disk.RootDirectory.FATAllocation.LostClusters
+            If Cluster > LastCluster + 1 Then
+                If Length > 0 Then
+                    HexViewSectorData.SectorData.AddBlockByOffset(Offset, Length)
+                End If
+                Offset = Disk.BPB.ClusterToOffset(Cluster)
+                Length = 0
+            End If
+            Length += Disk.BPB.BytesPerCluster
+            LastCluster = Cluster
+        Next
+
+        If Length > 0 Then
+            HexViewSectorData.SectorData.AddBlockByOffset(Offset, Length)
+        End If
+
+        Return HexViewSectorData
+    End Function
+    Public Function HexViewRootDirectory(Disk As Disk) As HexViewSectorData
+        Dim HexViewSectorData As New HexViewSectorData(Disk, Disk.RootDirectory.SectorChain)
+        HighlightDirectoryData(Disk, HexViewSectorData, True)
+
+        HexViewSectorData.Description = WithoutHotkey(My.Resources.Menu_RootDirectory)
+
+        Return HexViewSectorData
+    End Function
     Private Sub HighlightDirectoryData(Disk As Disk, HexViewSectorData As HexViewSectorData, CheckBootSector As Boolean)
         Dim EndOfDirectory As Boolean = False
 
@@ -269,18 +390,18 @@ Module HexViews
             Dim SectorBlock = HexViewSectorData.SectorData.GetBlock(Index)
             Dim HighlightedRegions As New HighlightedRegions
             HexViewSectorData.HighlightedRegionList.Add(HighlightedRegions)
-            Dim OffsetStart As UInteger = Disk.SectorToBytes(SectorBlock.SectorStart)
-            Dim OffsetEnd As UInteger = Disk.SectorToBytes(SectorBlock.SectorStart + SectorBlock.SectorCount) - 1
+            Dim OffsetStart As UInteger = Disk.BPB.SectorToBytes(SectorBlock.SectorStart)
+            Dim OffsetEnd As UInteger = Disk.BPB.SectorToBytes(SectorBlock.SectorStart + SectorBlock.SectorCount) - 1
             For Offset As UInteger = OffsetStart To OffsetEnd Step DirectoryEntry.DIRECTORY_ENTRY_SIZE
                 Dim FirstByte = Disk.Image.GetByte(Offset)
                 If FirstByte = 0 Then
                     EndOfDirectory = True
                 End If
                 If Not HasBootSector And CheckBootSector Then
-                    If BootSector.ValidJumpInstructuon.Contains(FirstByte) Then
+                    If BootSector.ValidJumpInstruction.Contains(FirstByte) Then
                         If OffsetEnd - Offset + 1 >= BootSector.BOOT_SECTOR_SIZE Then
                             Dim BootSectorData = Disk.Image.GetBytes(Offset, DiskImage.BootSector.BOOT_SECTOR_SIZE)
-                            Dim BootSector = New BootSector(BootSectorData)
+                            Dim BootSector As New BootSector(BootSectorData)
                             If BootSector.BPB.IsValid Then
                                 HasBootSector = True
                                 BootSectorOffset = Offset
@@ -299,28 +420,28 @@ Module HexViews
                 Else
                     Dim Attributes As Byte = Disk.Image.GetByte(Offset + DirectoryEntry.DirectoryEntryOffsets.Attributes)
                     If (Attributes And DirectoryEntry.AttributeFlags.LongFileName) = DirectoryEntry.AttributeFlags.LongFileName Then
-                        HighlightedRegions.AddDirectoryEntryLFNOffset(Offset - OffsetStart, DirectoryEntry.LFNOffsets.Sequence, Color.Purple)
+                        HighlightedRegions.AddDirectoryEntryLFNOffset(Offset - OffsetStart, DirectoryEntry.LFNOffsets.Sequence, Color.FromArgb(&H0, &H80, &HA0))
                         HighlightedRegions.AddDirectoryEntryLFNOffset(Offset - OffsetStart, DirectoryEntry.LFNOffsets.FilePart1, Color.Purple)
-                        HighlightedRegions.AddDirectoryEntryLFNOffset(Offset - OffsetStart, DirectoryEntry.LFNOffsets.Attributes, Color.Purple)
-                        HighlightedRegions.AddDirectoryEntryLFNOffset(Offset - OffsetStart, DirectoryEntry.LFNOffsets.Type, Color.Purple)
-                        HighlightedRegions.AddDirectoryEntryLFNOffset(Offset - OffsetStart, DirectoryEntry.LFNOffsets.Checksum, Color.Purple)
+                        HighlightedRegions.AddDirectoryEntryLFNOffset(Offset - OffsetStart, DirectoryEntry.LFNOffsets.Attributes, Color.Black)
+                        HighlightedRegions.AddDirectoryEntryLFNOffset(Offset - OffsetStart, DirectoryEntry.LFNOffsets.Type, Color.Black)
+                        HighlightedRegions.AddDirectoryEntryLFNOffset(Offset - OffsetStart, DirectoryEntry.LFNOffsets.Checksum, Color.FromArgb(&HC0, &H60, &H0))
                         HighlightedRegions.AddDirectoryEntryLFNOffset(Offset - OffsetStart, DirectoryEntry.LFNOffsets.FilePart2, Color.Purple)
-                        HighlightedRegions.AddDirectoryEntryLFNOffset(Offset - OffsetStart, DirectoryEntry.LFNOffsets.StartingCluster, Color.Purple)
+                        HighlightedRegions.AddDirectoryEntryLFNOffset(Offset - OffsetStart, DirectoryEntry.LFNOffsets.StartingCluster, Color.Black)
                         HighlightedRegions.AddDirectoryEntryLFNOffset(Offset - OffsetStart, DirectoryEntry.LFNOffsets.FilePart3, Color.Purple)
                     Else
                         HighlightedRegions.AddDirectoryEntryOffset(Offset - OffsetStart, DirectoryEntry.DirectoryEntryOffsets.FileName, Color.Blue)
                         HighlightedRegions.AddDirectoryEntryOffset(Offset - OffsetStart, DirectoryEntry.DirectoryEntryOffsets.Extension, Color.Blue)
-                        HighlightedRegions.AddDirectoryEntryOffset(Offset - OffsetStart, DirectoryEntry.DirectoryEntryOffsets.Attributes, Color.Blue)
-                        HighlightedRegions.AddDirectoryEntryOffset(Offset - OffsetStart, DirectoryEntry.DirectoryEntryOffsets.ReservedForWinNT, Color.Blue)
-                        HighlightedRegions.AddDirectoryEntryOffset(Offset - OffsetStart, DirectoryEntry.DirectoryEntryOffsets.CreationMillisecond, Color.Blue)
-                        HighlightedRegions.AddDirectoryEntryOffset(Offset - OffsetStart, DirectoryEntry.DirectoryEntryOffsets.CreationTime, Color.Blue)
-                        HighlightedRegions.AddDirectoryEntryOffset(Offset - OffsetStart, DirectoryEntry.DirectoryEntryOffsets.CreationDate, Color.Blue)
-                        HighlightedRegions.AddDirectoryEntryOffset(Offset - OffsetStart, DirectoryEntry.DirectoryEntryOffsets.LastAccessDate, Color.Blue)
-                        HighlightedRegions.AddDirectoryEntryOffset(Offset - OffsetStart, DirectoryEntry.DirectoryEntryOffsets.ReservedForFAT32, Color.Blue)
-                        HighlightedRegions.AddDirectoryEntryOffset(Offset - OffsetStart, DirectoryEntry.DirectoryEntryOffsets.LastWriteTime, Color.Blue)
-                        HighlightedRegions.AddDirectoryEntryOffset(Offset - OffsetStart, DirectoryEntry.DirectoryEntryOffsets.LastWriteDate, Color.Blue)
-                        HighlightedRegions.AddDirectoryEntryOffset(Offset - OffsetStart, DirectoryEntry.DirectoryEntryOffsets.StartingCluster, Color.Blue)
-                        HighlightedRegions.AddDirectoryEntryOffset(Offset - OffsetStart, DirectoryEntry.DirectoryEntryOffsets.FileSize, Color.Blue)
+                        HighlightedRegions.AddDirectoryEntryOffset(Offset - OffsetStart, DirectoryEntry.DirectoryEntryOffsets.Attributes, Color.DarkOrange)
+                        HighlightedRegions.AddDirectoryEntryOffset(Offset - OffsetStart, DirectoryEntry.DirectoryEntryOffsets.ReservedForWinNT, Color.Black)
+                        HighlightedRegions.AddDirectoryEntryOffset(Offset - OffsetStart, DirectoryEntry.DirectoryEntryOffsets.CreationMillisecond, Color.FromArgb(0, 128, 0))
+                        HighlightedRegions.AddDirectoryEntryOffset(Offset - OffsetStart, DirectoryEntry.DirectoryEntryOffsets.CreationTime, Color.FromArgb(0, 128, 0))
+                        HighlightedRegions.AddDirectoryEntryOffset(Offset - OffsetStart, DirectoryEntry.DirectoryEntryOffsets.CreationDate, Color.FromArgb(0, 128, 0))
+                        HighlightedRegions.AddDirectoryEntryOffset(Offset - OffsetStart, DirectoryEntry.DirectoryEntryOffsets.LastAccessDate, Color.FromArgb(0, 128, 0))
+                        HighlightedRegions.AddDirectoryEntryOffset(Offset - OffsetStart, DirectoryEntry.DirectoryEntryOffsets.ReservedForFAT32, Color.Black)
+                        HighlightedRegions.AddDirectoryEntryOffset(Offset - OffsetStart, DirectoryEntry.DirectoryEntryOffsets.LastWriteTime, Color.FromArgb(0, 128, 0))
+                        HighlightedRegions.AddDirectoryEntryOffset(Offset - OffsetStart, DirectoryEntry.DirectoryEntryOffsets.LastWriteDate, Color.FromArgb(0, 128, 0))
+                        HighlightedRegions.AddDirectoryEntryOffset(Offset - OffsetStart, DirectoryEntry.DirectoryEntryOffsets.StartingCluster, Color.DarkRed)
+                        HighlightedRegions.AddDirectoryEntryOffset(Offset - OffsetStart, DirectoryEntry.DirectoryEntryOffsets.FileSize, Color.Red)
                     End If
                     'HighlightedRegions.AddItem(Offset - OffsetStart, DirectoryEntry.DIRECTORY_ENTRY_SIZE, Color.Blue)
                 End If
@@ -338,8 +459,8 @@ Module HexViews
                 Dim BytesRemaining = FileSize
                 For J = 0 To SectorBlock.SectorCount - 1
                     Dim Sector = SectorBlock.SectorStart + J
-                    Dim BlockOffset = J * Disk.BYTES_PER_SECTOR
-                    Dim BlockSize = Math.Min(BytesRemaining, Disk.BYTES_PER_SECTOR)
+                    Dim BlockOffset = J * Disk.BPB.BytesPerSector
+                    Dim BlockSize = Math.Min(BytesRemaining, Disk.BPB.BytesPerSector)
                     If BlockSize > 0 Then
                         Dim Cluster = Disk.BPB.SectorToCluster(Sector)
                         If Disk.RootDirectory.FATAllocation.FileAllocation.ContainsKey(Cluster) Then

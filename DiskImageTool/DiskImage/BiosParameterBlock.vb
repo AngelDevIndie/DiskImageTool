@@ -7,7 +7,7 @@ Namespace DiskImage
         Public Shared ReadOnly ValidNumberOfFATS() As Byte = {1, 2}
         Public Shared ReadOnly ValidNumberOfHeads() As UShort = {1, 2}
         Public Shared ReadOnly ValidSectorsPerCluster() As Byte = {1, 2, 4, 8, 16, 32, 64, 128}
-        Public Shared ReadOnly ValidSectorsPerTrack() As UShort = {8, 9, 15, 18, 19, 21, 23, 36}
+        Public Shared ReadOnly ValidSectorsPerTrack() As UShort = {8, 9, 10, 15, 18, 19, 21, 23, 36}
         Private ReadOnly _FloppyImage As IFloppyImage
         Private ReadOnly _Offset As UInteger
 
@@ -176,11 +176,15 @@ Namespace DiskImage
         End Property
 
         Public Function BytesPerCluster() As UInteger
-            Return Disk.SectorToBytes(SectorsPerCluster)
+            Return SectorToBytes(SectorsPerCluster)
+        End Function
+
+        Public Function BytesToSector(Bytes As UInteger) As UInteger
+            Return CeilDiv(Bytes, BytesPerSector)
         End Function
 
         Public Function ClusterToOffset(Cluster As UShort) As UInteger
-            Return Disk.SectorToBytes(ClusterToSector(Cluster))
+            Return SectorToBytes(ClusterToSector(Cluster))
         End Function
 
         Public Function ClusterToSector(Cluster As UShort) As UInteger
@@ -224,7 +228,7 @@ Namespace DiskImage
         End Function
 
         Public Function HasValidRootEntryCount() As Boolean
-            Return (RootEntryCount * 32) Mod Disk.BYTES_PER_SECTOR = 0
+            Return (RootEntryCount * 32) Mod BytesPerSector = 0
         End Function
 
         Public Function HasValidSectorsPerCluster(CheckMediaDescriptor As Boolean) As Boolean
@@ -247,21 +251,22 @@ Namespace DiskImage
         End Function
 
         Public Function ImageSize() As UInteger
-            Return Disk.SectorToBytes(SectorCount())
+            Return SectorToBytes(SectorCount())
         End Function
 
         Public Function IsFATRegion(Offset As UInteger, Length As UInteger) As Boolean
             Dim FATSectorStart = FATRegionStart()
             Dim FATSectorEnd = FATSectorStart + (SectorsPerFAT * NumberOfFATs) - 1
 
-            Dim SectorStart = Disk.OffsetToSector(Offset)
-            Dim SectorEnd = Disk.OffsetToSector(Offset + Length - 1)
+            Dim SectorStart = OffsetToSector(Offset)
+            Dim SectorEnd = OffsetToSector(Offset + Length - 1)
 
             Return (SectorStart >= FATSectorStart And SectorStart <= FATSectorEnd) Or (SectorEnd >= FATSectorStart And SectorEnd <= FATSectorEnd)
         End Function
 
         Public Function IsValid() As Boolean
             Return _FloppyImage.Length >= BPB_SIZE _
+                AndAlso HasValidBytesPerSector() _
                 AndAlso HasValidSectorsPerCluster(False) _
                 AndAlso HasValidReservedSectorCount() _
                 AndAlso HasValidNumberOfFATs() _
@@ -279,15 +284,19 @@ Namespace DiskImage
         End Function
 
         Public Function OffsetToCluster(Offset As UInteger) As UShort
-            Return SectorToCluster(Disk.OffsetToSector(Offset))
+            Return SectorToCluster(OffsetToSector(Offset))
+        End Function
+
+        Public Function OffsetToSector(Offset As UInteger) As UInteger
+            Return Offset \ BytesPerSector
         End Function
 
         Public Function ReportedImageSize() As UInteger
-            Return Disk.SectorToBytes(DataRegionStart() + DataRegionSize())
+            Return SectorToBytes(DataRegionStart() + DataRegionSize())
         End Function
 
         Public Function RootDirectoryRegionSize() As UInteger
-            Return Disk.BytesToSector(RootEntryCount * 32)
+            Return BytesToSector(RootEntryCount * 32)
         End Function
 
         Public Function RootDirectoryRegionStart() As UInteger
@@ -300,6 +309,10 @@ Namespace DiskImage
             Else
                 Return SectorCountLarge
             End If
+        End Function
+
+        Public Function SectorToBytes(Sector As UInteger) As UInteger
+            Return Sector * BytesPerSector()
         End Function
 
         Public Function SectorToCluster(Sector As UInteger) As UShort

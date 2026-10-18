@@ -12,8 +12,8 @@ Public Class FilePropertiesFormMultiple
         _Disk = Disk
         _DirectoryEntries = DirectoryEntries
 
-        MyBase.Text = "File Properties"
-        BtnUpdate.Text = "Update"
+        MyBase.Text = WithoutHotkey(My.Resources.Menu_FileProperties)
+        BtnUpdate.Text = My.Resources.Menu_Update
     End Sub
 
     Public ReadOnly Property Updated As Boolean
@@ -21,6 +21,18 @@ Public Class FilePropertiesFormMultiple
             Return _Updated
         End Get
     End Property
+
+    Public Shared Function Display(Disk As Disk, DirectoryEntries As List(Of DirectoryEntry)) As Boolean
+        Using dlg As New FilePropertiesFormMultiple(Disk, DirectoryEntries)
+            dlg.ShowDialog(App.CurrentFormInstance)
+
+            If dlg.DialogResult = DialogResult.OK Then
+                Return dlg.Updated
+            Else
+                Return False
+            End If
+        End Using
+    End Function
 
     Private Sub ApplyUpdate()
         _Updated = False
@@ -50,7 +62,7 @@ Public Class FilePropertiesFormMultiple
 
     Private Sub PopulateForm()
         Dim DT As DiskImage.ExpandedDate
-        Dim LastWritten = New Date(1980, 1, 1, 0, 0, 0)
+        Dim LastWritten As New Date(1980, 1, 1, 0, 0, 0)
         Dim Created As Date? = Nothing
         Dim LastAccessed As Date? = Nothing
         Dim SetArchived As Boolean = True
@@ -61,8 +73,8 @@ Public Class FilePropertiesFormMultiple
         IsVolumeLabel = False
         Deleted = False
 
-        GroupFileName.Text = "Multiple Files"
-        LblMultipleFiles.Text = "(" & _DirectoryEntries.Count & " Files Selected)"
+        GroupFileName.Text = My.Resources.Label_MultipleFiles
+        LblMultipleFiles.Text = InParens(_DirectoryEntries.Count & " " & My.Resources.Label_FilesSelected)
 
         For Each DirectoryEntry In _DirectoryEntries
             DT = DirectoryEntry.GetLastWriteDate

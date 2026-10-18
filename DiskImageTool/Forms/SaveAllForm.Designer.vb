@@ -51,53 +51,58 @@ Partial Class SaveAllForm
         '
         'BtnYes
         '
+        Me.BtnYes.AutoSize = True
         Me.BtnYes.Location = New System.Drawing.Point(4, 10)
         Me.BtnYes.Margin = New System.Windows.Forms.Padding(4, 10, 4, 9)
         Me.BtnYes.Name = "BtnYes"
         Me.BtnYes.Size = New System.Drawing.Size(75, 23)
         Me.BtnYes.TabIndex = 3
-        Me.BtnYes.Text = "&Yes"
+        Me.BtnYes.Text = "{&Yes}"
         Me.BtnYes.UseVisualStyleBackColor = True
         '
         'BtnNo
         '
+        Me.BtnNo.AutoSize = True
         Me.BtnNo.Location = New System.Drawing.Point(87, 10)
         Me.BtnNo.Margin = New System.Windows.Forms.Padding(4, 10, 4, 9)
         Me.BtnNo.Name = "BtnNo"
         Me.BtnNo.Size = New System.Drawing.Size(75, 23)
         Me.BtnNo.TabIndex = 4
-        Me.BtnNo.Text = "&No"
+        Me.BtnNo.Text = "{&No}"
         Me.BtnNo.UseVisualStyleBackColor = True
         '
         'BtnCancel
         '
+        Me.BtnCancel.AutoSize = True
         Me.BtnCancel.DialogResult = System.Windows.Forms.DialogResult.Cancel
         Me.BtnCancel.Location = New System.Drawing.Point(170, 10)
         Me.BtnCancel.Margin = New System.Windows.Forms.Padding(4, 10, 4, 9)
         Me.BtnCancel.Name = "BtnCancel"
         Me.BtnCancel.Size = New System.Drawing.Size(75, 23)
         Me.BtnCancel.TabIndex = 0
-        Me.BtnCancel.Text = "&Cancel"
+        Me.BtnCancel.Text = "{&Cancel}"
         Me.BtnCancel.UseVisualStyleBackColor = True
         '
         'BtnYesToAll
         '
+        Me.BtnYesToAll.AutoSize = True
         Me.BtnYesToAll.Location = New System.Drawing.Point(253, 10)
         Me.BtnYesToAll.Margin = New System.Windows.Forms.Padding(4, 10, 4, 9)
         Me.BtnYesToAll.Name = "BtnYesToAll"
         Me.BtnYesToAll.Size = New System.Drawing.Size(75, 23)
         Me.BtnYesToAll.TabIndex = 1
-        Me.BtnYesToAll.Text = "Yes to &all"
+        Me.BtnYesToAll.Text = "{Yes to &all}"
         Me.BtnYesToAll.UseVisualStyleBackColor = True
         '
         'BtnNoToall
         '
+        Me.BtnNoToall.AutoSize = True
         Me.BtnNoToall.Location = New System.Drawing.Point(336, 10)
         Me.BtnNoToall.Margin = New System.Windows.Forms.Padding(4, 10, 4, 9)
         Me.BtnNoToall.Name = "BtnNoToall"
         Me.BtnNoToall.Size = New System.Drawing.Size(75, 23)
         Me.BtnNoToall.TabIndex = 2
-        Me.BtnNoToall.Text = "N&o to all"
+        Me.BtnNoToall.Text = "{N&o to all}"
         Me.BtnNoToall.UseVisualStyleBackColor = True
         '
         'Panel1
@@ -117,9 +122,9 @@ Partial Class SaveAllForm
         Me.LblCaption.Margin = New System.Windows.Forms.Padding(3, 0, 3, 75)
         Me.LblCaption.MaximumSize = New System.Drawing.Size(378, 0)
         Me.LblCaption.Name = "LblCaption"
-        Me.LblCaption.Size = New System.Drawing.Size(43, 13)
+        Me.LblCaption.Size = New System.Drawing.Size(51, 13)
         Me.LblCaption.TabIndex = 0
-        Me.LblCaption.Text = "Caption"
+        Me.LblCaption.Text = "{Caption}"
         Me.LblCaption.UseMnemonic = False
         '
         'SaveAllForm
@@ -139,8 +144,8 @@ Partial Class SaveAllForm
         Me.Name = "SaveAllForm"
         Me.ShowIcon = False
         Me.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen
-        Me.Text = "Save"
         Me.FlowLayoutPanel1.ResumeLayout(False)
+        Me.FlowLayoutPanel1.PerformLayout()
         Me.Panel1.ResumeLayout(False)
         Me.Panel1.PerformLayout()
         Me.ResumeLayout(False)

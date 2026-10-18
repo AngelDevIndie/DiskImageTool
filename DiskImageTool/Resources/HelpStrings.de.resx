@@ -1,0 +1,522 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <!-- 
+    Microsoft ResX Schema 
+    
+    Version 2.0
+    
+    The primary goals of this format is to allow a simple XML format 
+    that is mostly human readable. The generation and parsing of the 
+    various data types are done through the TypeConverter classes 
+    associated with the data types.
+    
+    Example:
+    
+    ... ado.net/XML headers & schema ...
+    <resheader name="resmimetype">text/microsoft-resx</resheader>
+    <resheader name="version">2.0</resheader>
+    <resheader name="reader">System.Resources.ResXResourceReader, System.Windows.Forms, ...</resheader>
+    <resheader name="writer">System.Resources.ResXResourceWriter, System.Windows.Forms, ...</resheader>
+    <data name="Name1"><value>this is my long string</value><comment>this is a comment</comment></data>
+    <data name="Color1" type="System.Drawing.Color, System.Drawing">Blue</data>
+    <data name="Bitmap1" mimetype="application/x-microsoft.net.object.binary.base64">
+        <value>[base64 mime encoded serialized .NET Framework object]</value>
+    </data>
+    <data name="Icon1" type="System.Drawing.Icon, System.Drawing" mimetype="application/x-microsoft.net.object.bytearray.base64">
+        <value>[base64 mime encoded string representing a byte array form of the .NET Framework object]</value>
+        <comment>This is a comment</comment>
+    </data>
+                
+    There are any number of "resheader" rows that contain simple 
+    name/value pairs.
+    
+    Each data row contains a name, and value. The row also contains a 
+    type or mimetype. Type corresponds to a .NET class that support 
+    text/value conversion through the TypeConverter architecture. 
+    Classes that don't support this are serialized and stored with the 
+    mimetype set.
+    
+    The mimetype is used for serialized objects, and tells the 
+    ResXResourceReader how to depersist the object. This is currently not 
+    extensible. For a given mimetype the value must be set accordingly:
+    
+    Note - application/x-microsoft.net.object.binary.base64 is the format 
+    that the ResXResourceWriter will generate, however the reader can 
+    read any of the formats listed below.
+    
+    mimetype: application/x-microsoft.net.object.binary.base64
+    value   : The object must be serialized with 
+            : System.Runtime.Serialization.Formatters.Binary.BinaryFormatter
+            : and then encoded with base64 encoding.
+    
+    mimetype: application/x-microsoft.net.object.soap.base64
+    value   : The object must be serialized with 
+            : System.Runtime.Serialization.Formatters.Soap.SoapFormatter
+            : and then encoded with base64 encoding.
+
+    mimetype: application/x-microsoft.net.object.bytearray.base64
+    value   : The object must be serialized into a byte array 
+            : using a System.ComponentModel.TypeConverter
+            : and then encoded with base64 encoding.
+    -->
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="BootSectorForm_AdditionalData" xml:space="preserve">
+    <value>Dies sind zusätzliche Daten, die im Bootsektor gefunden wurden.
+
+Hinweis: Grün hervorgehobene Daten sind der Bootstrap-Code.</value>
+  </data>
+  <data name="BootSectorForm_AllowedValues" xml:space="preserve">
+    <value>Zulässige Werte:</value>
+  </data>
+  <data name="BootSectorForm_AllowedValuesInline" xml:space="preserve">
+    <value>Zulässige Werte: {0}</value>
+  </data>
+  <data name="BootSectorForm_BootSectorSignature" xml:space="preserve">
+    <value>Zeigt dem BIOS an, dass der Sektor ausführbar ist.</value>
+  </data>
+  <data name="BootSectorForm_BytesPerSector" xml:space="preserve">
+    <value>Anzahl der Bytes in jedem physischen Sektor</value>
+  </data>
+  <data name="BootSectorForm_BytesPerSector_Note" xml:space="preserve">
+    <value>Hinweis: Für alle Disketten sollte dieser Wert {0} sein.</value>
+  </data>
+  <data name="BootSectorForm_DiskType" xml:space="preserve">
+    <value>Der auf Basis der aktuellen Werte im Bootsektor erkannte Diskettentyp. Wenn Sie diesen ändern, werden die Werte im Bootsektor an den ausgewählten Diskettentyp angepasst.</value>
+  </data>
+  <data name="BootSectorForm_DriveNumber" xml:space="preserve">
+    <value>Interrupt 13h Laufwerksnummer</value>
+  </data>
+  <data name="BootSectorForm_ExtendedBootSignature" xml:space="preserve">
+    <value>28h\tVolumeseriennummer ist vorhanden
+29h\tVolumeseriennummer, Volume-Label und Dateisystem-ID sind vorhanden</value>
+  </data>
+  <data name="BootSectorForm_FileSystemType" xml:space="preserve">
+    <value>Die Dateisystem-ID dient nur zu Informationszwecken</value>
+  </data>
+  <data name="BootSectorForm_FixedDisk" xml:space="preserve">
+    <value>Feste Festplatte</value>
+  </data>
+  <data name="BootSectorForm_HiddenSectors" xml:space="preserve">
+    <value>Anzahl der Sektoren vor dem ersten Sektor eines partitionierten Volumes
+
+Hinweis: Für alle Disketten sollte dieser Wert {0} sein</value>
+  </data>
+  <data name="BootSectorForm_JumpInstruction" xml:space="preserve">
+    <value>Diese Anweisung gibt an, wo der Bootstrap-Code beginnt.</value>
+  </data>
+  <data name="BootSectorForm_NumberOfFATs" xml:space="preserve">
+    <value>Anzahl der File Allocation Table (FAT)-Kopien auf dem Volume
+
+Zulässige Werte: Jeder von null verschiedene Wert
+
+Hinweis: Dieser Wert sollte typischerweise auf {0} gesetzt werden.</value>
+  </data>
+  <data name="BootSectorForm_NumberOfHeads" xml:space="preserve">
+    <value>Anzahl der physischen Köpfe (Seiten) auf der Diskette</value>
+  </data>
+  <data name="BootSectorForm_OEMName" xml:space="preserve">
+    <value>OEM-Name-Kennung
+
+Kann von einer FAT-Implementierung auf einen beliebigen Wert gesetzt werden.
+
+Typischerweise gibt dieser Wert an, welches System das Volume formatiert hat.</value>
+  </data>
+  <data name="BootSectorForm_ReservedSectors" xml:space="preserve">
+    <value>Anzahl reservierter Sektoren im reservierten Bereich des Volumes, beginnend mit dem ersten Sektor des Volumes
+
+Zulässige Werte: Jeder von Null verschiedene Wert
+
+Hinweis: Dieser Wert sollte typischerweise auf {0} gesetzt werden.</value>
+  </data>
+  <data name="BootSectorForm_RootDirectoryEntries" xml:space="preserve">
+    <value>Anzahl der Einträge im Stammverzeichnis
+
+Zulässige Werte: Der Wert multipliziert mit {0} sollte ein geradzahliges Vielfaches der Bytes pro Sektor sein</value>
+  </data>
+  <data name="BootSectorForm_SectorCountLarge" xml:space="preserve">
+    <value>Gesamtanzahl der Sektoren in einem FAT16-Volume mit mehr als {0} Sektoren
+
+Hinweis: Für alle Disketten sollte dieser Wert {1} sein</value>
+  </data>
+  <data name="BootSectorForm_SectorCountSmall" xml:space="preserve">
+    <value>Gesamtanzahl der Sektoren im Volume</value>
+  </data>
+  <data name="BootSectorForm_SectorsPerCluster" xml:space="preserve">
+    <value>Anzahl der Sektoren pro Cluster</value>
+  </data>
+  <data name="BootSectorForm_SectorsPerFAT" xml:space="preserve">
+    <value>Anzahl der Sektoren, die jeder Kopie der Dateizuordnungstabelle (FAT) zugewiesen sind</value>
+  </data>
+  <data name="BootSectorForm_SectorsPerTrack" xml:space="preserve">
+    <value>Anzahl der Sektoren pro Spur auf der Diskette</value>
+  </data>
+  <data name="BootSectorForm_TypicalValues" xml:space="preserve">
+    <value>Typische Werte:</value>
+  </data>
+  <data name="BootSectorForm_TypicalValuesInline" xml:space="preserve">
+    <value>Typische Werte: {0}</value>
+  </data>
+  <data name="BootSectorForm_Unused" xml:space="preserve">
+    <value>Nicht verwendet</value>
+  </data>
+  <data name="BootSectorForm_VolumeLabel" xml:space="preserve">
+    <value>Dieses Feld entspricht typischerweise dem 11-Byte-Volume-Label im Root-Verzeichnis der Diskette oder hat den Wert „{0}“, wenn kein Volume-Label vorhanden ist.</value>
+  </data>
+  <data name="BootSectorForm_VolumeSerialNumber" xml:space="preserve">
+    <value>Die Volume-Seriennummer ist eine 32-Bit-Zufallszahl, die zusammen mit dem Volume-Label zur Nachverfolgung von Wechseldatenträgern verwendet wird.
+
+Hinweis: Diese ID wird normalerweise erzeugt, indem das aktuelle Datum und die aktuelle Uhrzeit in einen 32-Bit-Wert umgewandelt werden</value>
+  </data>
+  <data name="BootSectorForm_VolumeSerialNumberButton" xml:space="preserve">
+    <value>Neue Volume-Seriennummer basierend auf einem vom Benutzer angegebenen Datum und Uhrzeit generieren</value>
+  </data>
+  <data name="Flux_86FSurfaceData" xml:space="preserve">
+    <value>Rohe Flux-Oberflächendaten in die .86F-Ausgabe
+einbeziehen.
+
+Nur mit PCImgCnv verfügbar, wenn der Ausgabetyp
+.86F ist.</value>
+  </data>
+  <data name="Flux_AutoSaveLog" xml:space="preserve">
+    <value>Speichert das Konvertierungsprotokoll automatisch
+neben dem Flux-Image-Set, wenn die Konvertierung
+erfolgreich ist.</value>
+  </data>
+  <data name="Flux_Clean" xml:space="preserve">
+    <value>Reinigt die Köpfe des Diskettenlaufwerks im
+ausgewählten Laufwerksschacht mit einer Reinigungsdiskette.</value>
+  </data>
+  <data name="Flux_ContinueAfterFailure" xml:space="preserve">
+    <value>Mit dem Schreiben der verbleibenden Spuren fortfahren,
+wenn eine Spur die Überprüfung nicht besteht, anstatt
+den Vorgang abzubrechen.</value>
+  </data>
+  <data name="Flux_Convert" xml:space="preserve">
+    <value>Das geladene Flux-Image-Set in den ausgewählten
+Image-Typ konvertieren, ohne das Laufwerk erneut zu lesen.</value>
+  </data>
+  <data name="Flux_Detect" xml:space="preserve">
+    <value>Versuchen, das Format der Diskette im ausgewählten Laufwerk durch Analyse des Bootsektors zu erkennen.</value>
+  </data>
+  <data name="Flux_Device" xml:space="preserve">
+    <value>Das Flux-Verarbeitungstool, das zum Dekodieren des
+geladenen Flux-Image-Sets verwendet wird (Greaseweazle,
+Kryoflux oder PCImgCnv).</value>
+  </data>
+  <data name="Flux_Discard" xml:space="preserve">
+    <value>Das geladene Image oder Image-Set verwerfen.</value>
+  </data>
+  <data name="Flux_DoubleStep" xml:space="preserve">
+    <value>Jede zweite Spur überspringen beim Lesen einer 360-KB-Diskette in einem 1,2-MB-Laufwerk.</value>
+  </data>
+  <data name="Flux_Erase" xml:space="preserve">
+    <value>Löscht die Diskette im ausgewählten Laufwerk.
+
+Wenn Spuren auswählen aktiviert ist, werden nur die im
+Raster ausgewählten Spuren gelöscht.</value>
+  </data>
+  <data name="Flux_EraseEmpty" xml:space="preserve">
+    <value>Löschmuster auf Spuren schreiben, die keine Daten
+enthalten, anstatt sie unverändert zu lassen.</value>
+  </data>
+  <data name="Flux_ExtendedLogOutput" xml:space="preserve">
+    <value>Erfasst die ausführliche Kryoflux-Ausgabe (Lese- und
+Zellendekodierungsereignisse) im Konvertierungsprotokoll.</value>
+  </data>
+  <data name="Flux_FolderName" xml:space="preserve">
+    <value>Der Unterordner unter dem Stammordner, in dem das
+Flux-Image-Set gespeichert wird.
+
+Sie können eine Ordnername-Vorlage erstellen, indem Sie eine Zahl
+in spitze Klammern (&lt; &gt;) einschließen. Zum Beispiel: Disk &lt;1&gt; von 3.
+
+Die Zahl in den Klammern wird für jeden weiteren Lesevorgang
+automatisch erhöht.</value>
+  </data>
+  <data name="Flux_Format" xml:space="preserve">
+    <value>Das Format der Diskette im ausgewählten Laufwerk.</value>
+  </data>
+  <data name="Flux_ImageFolder" xml:space="preserve">
+    <value>Der benutzerdefinierte Zielordner für die sekundäre
+Image-Datei, der verwendet wird, wenn Speicherort auf
+Benutzerdefiniert gesetzt ist.</value>
+  </data>
+  <data name="Flux_ImageFolderBrowse" xml:space="preserve">
+    <value>Nach dem Ordner suchen, in dem die sekundäre Image-Datei gespeichert wird.</value>
+  </data>
+  <data name="Flux_ImageLocation" xml:space="preserve">
+    <value>Wo die sekundäre Image-Datei gespeichert wird.
+
+Wählen Sie den Stammordner, denselben Ordner wie das
+Flux-Image-Set oder einen benutzerdefinierten Ordner.
+Die Auswahl von Benutzerdefiniert aktiviert das Feld
+Image-Ordner unten.</value>
+  </data>
+  <data name="Flux_ImageType" xml:space="preserve">
+    <value>Der primäre Ausgabetyp für den Lesevorgang.
+
+Flux-Image-Set speichert den rohen Flux als .raw-Set,
+das später erneut konvertiert werden kann. Die anderen
+Typen (.ima, .img, .hfe, ...) dekodieren die Diskette
+direkt in ein Sektor-Image.
+
+Wenn Flux-Image-Set ausgewählt ist, kann während desselben
+Lesevorgangs ein zusätzliches dekodiertes Image durch die
+Auswahl eines Ausgabetyps 2 erzeugt werden.</value>
+  </data>
+  <data name="Flux_Import" xml:space="preserve">
+    <value>Das geladene Image in Disk Image Tool importieren.</value>
+  </data>
+  <data name="Flux_ImportClose" xml:space="preserve">
+    <value>Das geladene Image importieren und diesen Dialog schließen.</value>
+  </data>
+  <data name="Flux_Modifications" xml:space="preserve">
+    <value>Zeigt die sektorweisen Änderungen an, die PCImgCnv
+während der Konvertierung angewendet hat.</value>
+  </data>
+  <data name="Flux_NoVerify" xml:space="preserve">
+    <value>Überprüfung nach dem Schreiben überspringen.
+
+Schneller, erkennt aber keine Schreibfehler.</value>
+  </data>
+  <data name="Flux_OpenFile" xml:space="preserve">
+    <value>Öffnet ein anderes Flux-Image-Set oder Sektor-Image
+zur Konvertierung.</value>
+  </data>
+  <data name="Flux_OutputSource" xml:space="preserve">
+    <value>Wenn das gleiche Flux-Set von mehr als einem Tool
+verarbeitet wurde, wählen Sie aus, welche Tool-Ausgabe
+für den Import verwendet wird.</value>
+  </data>
+  <data name="Flux_OutputType2" xml:space="preserve">
+    <value>Eine optionale zweite Ausgabe, die zusammen mit dem
+Flux-Image-Set während desselben Lesevorgangs erzeugt wird.
+
+Nur verfügbar, wenn der primäre Ausgabetyp Flux-Image-Set
+ist. Der ausgewählte Typ wird von der Diskette dekodiert
+und am unten gewählten Speicherort gespeichert.</value>
+  </data>
+  <data name="Flux_PreErase" xml:space="preserve">
+    <value>Jede Spur vor dem Schreiben löschen.
+
+Langsamer, aber zuverlässiger bei abgenutzten oder
+zuvor formatierten Medien.</value>
+  </data>
+  <data name="Flux_PrefixName" xml:space="preserve">
+    <value>Dateinamen-Präfix für die .raw-Spurdateien im
+Flux-Image-Set (z. B. ergibt "track" track00.0.raw,
+track00.1.raw, ...).
+
+Sie können eine Präfix-Vorlage erstellen, indem Sie eine Zahl
+in spitze Klammern (&lt; &gt;) einschließen. Zum Beispiel: seite&lt;1&gt;.
+
+Die Zahl in den Klammern wird für jeden weiteren Lesevorgang
+automatisch erhöht.</value>
+  </data>
+  <data name="Flux_Preview" xml:space="preserve">
+    <value>Den Inhalt der Diskette im ausgewählten Laufwerk in der
+Vorschau anzeigen, ohne ein Image zu speichern, oder das
+aktuell geladene Image in der Vorschau anzeigen.
+
+Bei einer noch nicht gelesenen Diskette wird die erste Spur
+gelesen und das Verzeichnis-Listing angezeigt.</value>
+  </data>
+  <data name="Flux_PreviewConvert" xml:space="preserve">
+    <value>Vorschau des Inhalts des aktuell konvertierten Images.</value>
+  </data>
+  <data name="Flux_Process" xml:space="preserve">
+    <value>Führt die Konvertierung für das aktuell geladene
+Flux-Image-Set aus.
+
+Wenn Spuren auswählen aktiviert ist, werden nur die im
+Raster ausgewählten Spuren neu konvertiert.</value>
+  </data>
+  <data name="Flux_Read" xml:space="preserve">
+    <value>Eine Diskette vom ausgewählten Laufwerk in den gewählten Ausgabetyp einlesen.
+
+Wenn Spuren auswählen aktiviert ist, werden nur die im
+unteren Raster ausgewählten Spuren erneut gelesen.</value>
+  </data>
+  <data name="Flux_Refine" xml:space="preserve">
+    <value>Ein vorhandenes Flux-Image-Set (.raw) öffnen und seinen
+aktuellen Zustand in das Spuren-Raster laden.
+
+Eine .raw-Datei oder ein Ordner mit .raw-Dateien kann
+auch auf das Spuren-Raster gezogen werden.
+
+Das Formular wird anschließend in den Spurenauswahl-Modus
+versetzt, sodass einzelne Spuren erneut gegen das ursprüngliche
+Flux-Set gelesen werden können.</value>
+  </data>
+  <data name="Flux_Remaster" xml:space="preserve">
+    <value>Wendet das gespeicherte Spurenlayout bei der
+Neukonvertierung mit PCImgCnv an.
+
+Nur verfügbar, wenn ein Spurenlayout generiert wurde.</value>
+  </data>
+  <data name="Flux_RootBrowse" xml:space="preserve">
+    <value>Nach dem Stammordner suchen, in dem Flux-Image-Sets gespeichert werden.</value>
+  </data>
+  <data name="Flux_Save" xml:space="preserve">
+    <value>Das geladene Flux-Image-Set am gewählten Zielort speichern.</value>
+  </data>
+  <data name="Flux_SaveClose" xml:space="preserve">
+    <value>Das geladene Flux-Image-Set speichern und diesen Dialog schließen.</value>
+  </data>
+  <data name="Flux_SaveLog" xml:space="preserve">
+    <value>Die Konsolenausgabe in einer Protokolldatei speichern.</value>
+  </data>
+  <data name="Flux_SelectTracks" xml:space="preserve">
+    <value>Spurweise Auswahl im unteren Raster aktivieren.
+
+Wenn aktiviert, werden beim nächsten Lesevorgang nur die
+im Raster ausgewählten Spuren erneut gelesen.</value>
+  </data>
+  <data name="Flux_ToggleSequence" xml:space="preserve">
+    <value>Die spitzen Klammern (&lt; &gt;) um die aktuelle Zahl im
+fokussierten Dateinamen-, Ordner- oder Präfixfeld setzen
+oder entfernen.
+
+Eine in Klammern eingeschlossene Zahl wird nach jedem
+Lesevorgang automatisch erhöht.</value>
+  </data>
+  <data name="Flux_TrackLayout" xml:space="preserve">
+    <value>Zeigt das spurweise Layout an, das PCImgCnv während
+der Konvertierung erzeugt hat.</value>
+  </data>
+  <data name="Flux_Verify" xml:space="preserve">
+    <value>Das geladene Flux-Image-Set mit Kryoflux überprüfen,
+ohne das Laufwerk erneut zu lesen.
+
+Die Überprüfungsergebnisse jeder Spur werden im
+oberen Raster angezeigt.</value>
+  </data>
+  <data name="Flux_Write" xml:space="preserve">
+    <value>Schreibt das geladene Image auf die Diskette im
+ausgewählten Laufwerk.
+
+Wenn Spuren auswählen aktiviert ist, werden nur die im
+Raster ausgewählten Spuren geschrieben.</value>
+  </data>
+  <data name="Greaseweazle_CleanCyls" xml:space="preserve">
+    <value>Anzahl der zu reinigenden Zylinder.
+
+Die meisten Laufwerke verwenden 40 (5,25" doppelte Dichte)
+oder 80 (alle anderen).</value>
+  </data>
+  <data name="Greaseweazle_CleanLinger" xml:space="preserve">
+    <value>Zeit in Millisekunden, die der Kopf während eines
+Durchgangs auf jedem Zylinder verweilt.</value>
+  </data>
+  <data name="Greaseweazle_CleanPasses" xml:space="preserve">
+    <value>Anzahl der durchzuführenden Reinigungsdurchgänge.</value>
+  </data>
+  <data name="Greaseweazle_DeviceReset" xml:space="preserve">
+    <value>Das Greaseweazle-Gerät auf den Einschalt-Standardzustand zurücksetzen.</value>
+  </data>
+  <data name="Greaseweazle_Drives" xml:space="preserve">
+    <value>Verfügbare Diskettenlaufwerke.
+
+Diese Liste kann unter
+Greaseweazle-Konfiguration im Optionsmenü angepasst werden.</value>
+  </data>
+  <data name="Greaseweazle_FileExt" xml:space="preserve">
+    <value>Die Erweiterung der Ausgabedatei.</value>
+  </data>
+  <data name="Greaseweazle_FileExt2" xml:space="preserve">
+    <value>Die Dateierweiterung für die sekundäre Ausgabe.</value>
+  </data>
+  <data name="Greaseweazle_Hfreq" xml:space="preserve">
+    <value>Löschen mit einem Hochfrequenzsignal anstelle des
+standardmäßigen DC-Löschens. Verwenden Sie dies für
+Medien, die nicht auf eine normale Löschung reagieren.</value>
+  </data>
+  <data name="Greaseweazle_ReadFilename" xml:space="preserve">
+    <value>Der Name der Ausgabedatei.
+
+Sie können eine Dateinamen-Vorlage erstellen, indem Sie eine Zahl
+in spitze Klammern (&lt; &gt;) einschließen. Zum Beispiel: Disk &lt;1&gt; von 3.
+
+Die Zahl in den Klammern wird für jeden weiteren Lesevorgang
+automatisch erhöht.</value>
+  </data>
+  <data name="Greaseweazle_Retries" xml:space="preserve">
+    <value>Maximale Anzahl an Lese-Wiederholungen pro Spur, wenn ein Lesefehler auftritt.</value>
+  </data>
+  <data name="Greaseweazle_Revs" xml:space="preserve">
+    <value>Anzahl der Umdrehungen pro Spur zum Lesen</value>
+  </data>
+  <data name="Greaseweazle_RootFolder" xml:space="preserve">
+    <value>Der Stammordner für Ihre Flux-Image-Sets.
+
+Der standardmäßige Stammordner kann unter
+Greaseweazle-Konfiguration im Optionsmenü eingestellt werden.</value>
+  </data>
+  <data name="Greaseweazle_SaveLog" xml:space="preserve">
+    <value>Eine Protokolldatei neben dem Flux-Image-Set speichern,
+die die Greaseweazle-Konsolenausgabe des Vorgangs erfasst.
+
+Der Name der Protokolldatei kann unter
+Greaseweazle-Konfiguration im Optionsmenü eingestellt werden.</value>
+  </data>
+  <data name="Greaseweazle_SeekRetries" xml:space="preserve">
+    <value>Maximale Anzahl, mit der der Laufwerkskopf eine Spur erneut anfährt, wenn alle Lese-Wiederholungen fehlschlagen.</value>
+  </data>
+</root>

@@ -2,41 +2,69 @@
 
 Module StringExtensions
     <Extension()>
-    Public Function Pluralize(Value As String, Count As Integer) As String
-        Return Value & IIf(Count <> 1, "s", "")
+    Public Function WordWrap(Text As String, MaxWidth As Integer, TargetWidth As Integer, Font As Font) As List(Of String)
+        If String.IsNullOrEmpty(Text) OrElse MaxWidth <= 0 Then
+            Return New List(Of String) From {Text}
+        End If
+
+        ' Normalize newlines and split into logical lines
+        Dim Lines = Text.Replace(vbCrLf, vbLf).Replace(vbCr, vbLf).Split(vbLf)
+
+        Dim DoReduceLines As Boolean = (Lines.Count = 1)
+
+        Dim Result As List(Of String)
+        Dim Words() As String = {}
+        Dim TryReduceLines As Boolean
+
+        Do
+            Result = New List(Of String)
+            For Each Line In Lines
+                ' Preserve blank lines
+                If Line = "" Then
+                    Result.Add("")
+                    Continue For
+                End If
+
+                Words = Line.Split(" ")
+
+                Result.AddRange(WrapLine(Words, TargetWidth, Font))
+            Next
+
+            TryReduceLines = DoReduceLines AndAlso Result.Count > 2 AndAlso TargetWidth < MaxWidth AndAlso Words.Length > 0
+
+            If TryReduceLines Then
+                TargetWidth += 4
+                If TargetWidth > MaxWidth Then
+                    TargetWidth = MaxWidth
+                End If
+            End If
+        Loop Until Not TryReduceLines
+
+        Return Result
     End Function
 
-    <Extension()>
-    Public Function WordWrap(Text As String, Width As Integer, Font As Font) As List(Of String)
-        Dim StringList = New List(Of String)
-        Dim Size = TextRenderer.MeasureText(Text, Font)
+    Private Function WrapLine(Words() As String, MaxWidth As Integer, Font As Font) As List(Of String)
+        Dim Lines As New List(Of String)()
+        Dim CurrentLine As String = ""
 
-        If String.IsNullOrEmpty(Text) OrElse Width = 0 OrElse Width >= Size.Width Then
-            StringList.Add(Text)
-            Return StringList
-        End If
-
-        Dim Words = Text.Split(" ")
-        Dim Line As String = ""
         For Each Word In Words
-            Dim NewLine = Line
-            If NewLine <> "" Then
-                NewLine &= " "
-            End If
-            NewLine &= Word
-            Size = TextRenderer.MeasureText(NewLine, Font)
+            Dim NewLine = If(CurrentLine = "", Word, CurrentLine & " " & Word)
+            Dim Size = TextRenderer.MeasureText(NewLine, Font)
 
-            If Size.Width <= Width Then
-                Line = NewLine
+            If Size.Width <= MaxWidth Then
+                CurrentLine = NewLine
             Else
-                StringList.Add(Line)
-                Line = Word
+                If CurrentLine <> "" Then
+                    Lines.Add(CurrentLine)
+                End If
+                CurrentLine = Word
             End If
         Next
-        If Line <> "" Then
-            StringList.Add(Line)
+
+        If CurrentLine <> "" Then
+            Lines.Add(CurrentLine)
         End If
 
-        Return StringList
+        Return Lines
     End Function
 End Module

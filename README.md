@@ -1,20 +1,44 @@
 # DiskImageTool
-View and manipulate floppy disk images
+A Powerful Floppy Disk Image Manager & Greaseweazle/KryoFlux Flux Tool
 
 This is a personal project of mine.  I decided to make the source code available in case anyone finds it useful, but at no time should it be considered production quality.
 
 What does DiskImageTool do?
 
-1. It allows you to view and perform simple repairs on IBM PC formatted floppy disk images.
-2. You can easily copy files out of the images by dragging and dropping.
-3. File properties editor
-4. Boot sector editor
-5. File Allocation Table (FAT) editor
-6. Full featured Hex editor.  Focus on individual regions of the disk or view and edit the entire disk.
-7. Text file viewer
-8. Easily repair a modified boot sector OEM Name using a built in database of suggestions.
-9. Clean up modifications made by Windows to the boot sector and directory entries with one click.
-10. Open hundreds of images at one time and use powerful filters to narrow down your search to the ones that need your attention.
+- It allows you to view and edit IBM PC formatted floppy disk images.
+- You can easily copy files and folders in and out of images by dragging and dropping.
+- Convert between multiple image formats
+- Create new disk images
+- File properties editor
+- Boot sector editor
+- File Allocation Table (FAT) editor
+- Full featured Hex editor.  Focus on individual regions of the disk or view and edit the entire disk.
+- Text file viewer
+- Raw track viewer
+- Easily repair a modified boot sector OEM Name using a built in database of suggestions.
+- Clean up modifications made by Windows to the boot sector and directory entries with one click.
+- Open hundreds of images at one time and use powerful filters to narrow down your search to the ones that need your attention.
+- Natively Read and Write floppy disks using a Greaseweazle (https://decromancer.ca/greaseweazle/)
+- Import raw Flux Sets using either built in Greaseweazle support or KryoFlux Host Software (https://kryoflux.com/)
+- Built in Database to identify known disk images (Mostly games at this time)
+
+DiskImageTool suports the following image formats:
+- Basic Sector Images (.ima, .img, .vfd, .flp, .160, .180, .320, .360, .720, .120, .144, .288, .dmf, .xdf)
+- WinImage Compressed Disk Image (.imz)
+- ImageDisk Sector Image (.imd)
+- TeleDisk Sector Image (.td0)
+- PCE Sector Image (.psi)
+- PCE Bitstream Image (.pri)
+- 86Box 86F Image (.86f)
+- HxC HFE v1 Image (.hfe)
+- HxC MFM Image (.mfm)
+- Transcopy Image (.tc)
+- Raw Flux Set (.raw) * Import Only; Uses built in Greaseweazle support or KryoFlux Host Software
+- Supercard Pro image (.scp) * Import Only
+
+DiskImageTool can also open the above image types from within Zip files.
+
+KryoFlux Host Software can be used for importing without requiring a hardware device.
 
 Suggestions for new features are welcome.
 
@@ -24,5 +48,11 @@ I have a discord channel set up for the discussion of DiskImageTool at [#diskima
 
 ---
 
-<img src="https://user-images.githubusercontent.com/5696659/227692756-913a5702-80d2-4915-8634-a8b5fc689e98.png" height="190">&nbsp;&nbsp;&nbsp;&nbsp;<img src="https://user-images.githubusercontent.com/5696659/227693418-8df385b5-96cf-4b7e-a48c-8e24defdf4f4.png" height="190">&nbsp;&nbsp;&nbsp;&nbsp;<img src="https://user-images.githubusercontent.com/5696659/231385191-f68e8599-1453-43f1-87ad-d13920848cdb.png" height="190">&nbsp;&nbsp;&nbsp;&nbsp;<img src="https://user-images.githubusercontent.com/5696659/227693425-5dfd4978-b390-4d2d-afc6-5aaf87ad36e9.png" height="190">
-
+<a href="https://github.com/Digitoxin1/DiskImageTool/wiki/UI-Overview" target="_blank" rel="noopener noreferrer"><img src="https://raw.githubusercontent.com/wiki/Digitoxin1/DiskImageTool/assets/Main-Window.png" height="204"></a>&nbsp;&nbsp;
+<a href="https://github.com/Digitoxin1/DiskImageTool/wiki/Dialog-Edit-Boot-Sector" target="_blank" rel="noopener noreferrer"><img src="https://raw.githubusercontent.com/wiki/Digitoxin1/DiskImageTool/assets/Boot-Sector-Dialog.png" height="204"></a>&nbsp;&nbsp;
+<a href="https://github.com/Digitoxin1/DiskImageTool/wiki/Dialog-Edit-FAT" target="_blank" rel="noopener noreferrer"><img src="https://raw.githubusercontent.com/wiki/Digitoxin1/DiskImageTool/assets/FAT-Dialog.png" height="204"></a>
+<br><br>
+<a href="https://github.com/Digitoxin1/DiskImageTool/wiki/Dialog-Hex-Editor" target="_blank" rel="noopener noreferrer"><img src="https://raw.githubusercontent.com/wiki/Digitoxin1/DiskImageTool/assets/Hex-Editor-Dialog.png" height="193"></a>&nbsp;&nbsp;
+<a href="https://github.com/Digitoxin1/DiskImageTool/wiki/Dialog-Raw-Track-Data" target="_blank" rel="noopener noreferrer"><img src="https://raw.githubusercontent.com/wiki/Digitoxin1/DiskImageTool/assets/Raw-Track-Data-Dialog.png" height="193"></a>
+<br><br>
+<a href="https://github.com/Digitoxin1/DiskImageTool/wiki/Dialog-Flux-Read-Disk" target="_blank" rel="noopener noreferrer"><img height="204" src="https://raw.githubusercontent.com/wiki/Digitoxin1/DiskImageTool/assets/Flux-Read-Dialog.png"></a>

@@ -1,12 +1,12 @@
 ﻿Imports System.ComponentModel
 Imports System.Runtime.InteropServices
 Imports DiskImageTool.DiskImage
-Imports Hb.Windows.Forms
+Imports DiskImageTool.Hb.Windows.Forms
 Imports DiskImageTool.HexView
 
 Public Class HexViewForm
     Private WithEvents CheckBoxSync As ToolStripCheckBox
-    Private WithEvents ComboTrack As ToolStripComboBox
+    Private WithEvents ComboTrack As ComboTrack
     Private WithEvents NumericCluster As ToolStripNumericUpDown
     Private WithEvents NumericSector As ToolStripNumericUpDown
     Public Shared ReadOnly ALT_BACK_COLOR As Color = Color.FromArgb(246, 246, 252)
@@ -38,6 +38,8 @@ Public Class HexViewForm
         ' This call is required by the designer.
         InitializeComponent()
         ' Add any initialization after the InitializeComponent() call.
+        LocalizeForm()
+
         _HexViewSectorData = HexViewSectorData
         _BPB = _HexViewSectorData.Disk.BPB
         _Changes = New Stack(Of List(Of HexChange))
@@ -54,19 +56,25 @@ Public Class HexViewForm
 
         If Not _BPB.IsValid Then
             _ClusterNavigator = False
+            If _BPB.BytesPerSector = 0 Then
+                _BPB.BytesPerSector = 512
+            End If
         End If
 
+        HexBox1.BytesPerSector = _BPB.BytesPerSector
+        HexBox1.SectorSeparatorVisible = True
         HexBox1.ReadOnly = False
 
         SetControlSize()
+        PopulateFillValues()
 
         If HexViewSectorData.Description = "" Then
-            Me.Text = "Hex Editor"
+            Me.Text = My.Resources.Caption_HexEditor
         Else
             Me.Text = HexViewSectorData.Description
         End If
 
-        CmbGroups.Size = New Drawing.Size(IIf(_SyncBlocks, 130, 218), CmbGroups.Size.Height)
+        CmbGroups.Size = New Drawing.Size(If(_SyncBlocks, 130, 218), CmbGroups.Size.Height)
         CmbGroups.DropDownWidth = CmbGroups.Width
 
         LblGroups.Visible = Not _SectorNavigator And Not _ClusterNavigator
@@ -93,6 +101,40 @@ Public Class HexViewForm
         End If
     End Sub
 
+    Private Sub LocalizeForm()
+        BtnCopyHex.Text = My.Resources.Menu_CopyHex
+        BtnCopyHexFormatted.Text = My.Resources.Menu_CopyHexFormatted
+        BtnCopyText.Text = My.Resources.Menu_CopyText
+        BtnCopyValue.Text = My.Resources.Menu_CopyValue
+        BtnDelete.Text = String.Format(My.Resources.Label_FillSelectionWith, "0x00")
+        BtnFill.Text = My.Resources.Label_FillSelection
+        BtnFillF6.Text = String.Format(My.Resources.Label_FillSelectionWith, "0xF6")
+        BtnFind.Text = My.Resources.Label_Find
+        BtnFindNext.Text = My.Resources.Label_FindNext
+        BtnPaste.Text = My.Resources.Menu_PasteOver
+        BtnRedo.Text = My.Resources.Menu_Redo
+        BtnSelectAll.Text = My.Resources.Menu_SelectAll
+        BtnUndo.Text = My.Resources.Menu_Undo
+        HexBox1.BuiltInContextMenu.CopyMenuItemText = WithoutHotkey(My.Resources.Menu_CopyText)
+        HexBox1.BuiltInContextMenu.SelectAllMenuItemText = My.Resources.Label_SelectAll
+        LblGroups.Text = My.Resources.Label_Display
+        ToolStripBtnCommit.Text = My.Resources.Label_Commit
+        ToolStripBtnCommit.ToolTipText = My.Resources.Label_CommitChanges
+        ToolStripBtnCopyHex.Text = WithoutHotkey(My.Resources.Menu_CopyHex)
+        ToolStripBtnCopyHexFormatted.Text = WithoutHotkey(My.Resources.Menu_CopyHexFormatted)
+        ToolStripBtnCopyText.Text = WithoutHotkey(My.Resources.Menu_CopyText)
+        ToolStripBtnDelete.Text = String.Format(My.Resources.Label_FillSelectionWith, "0x00")
+        ToolStripBtnFillF6.Text = String.Format(My.Resources.Label_FillSelectionWith, "0xF6")
+        ToolStripBtnFind.Text = My.Resources.Label_Find
+        ToolStripBtnFindNext.Text = My.Resources.Label_FindNext
+        ToolStripBtnPaste.Text = WithoutHotkey(My.Resources.Menu_PasteOver)
+        ToolStripBtnRedo.Text = WithoutHotkey(My.Resources.Menu_Redo)
+        ToolStripBtnSelectAll.Text = My.Resources.Label_SelectAll
+        ToolStripBtnSelectTrack.ToolTipText = My.Resources.Label_Track
+        ToolStripBtnUndo.Text = WithoutHotkey(My.Resources.Menu_Undo)
+    End Sub
+
+
     Public ReadOnly Property Modified As Boolean
         Get
             Return _Modified
@@ -102,6 +144,23 @@ Public Class HexViewForm
     Public Sub SetStartingCluster(Cluster As UShort)
         _StartingCluster = Cluster
     End Sub
+
+    Public Shared Function Display(HexViewSectorData As HexViewSectorData,
+                                   SectorNavigator As Boolean,
+                                   ClusterNavigator As Boolean,
+                                   SyncBlocks As Boolean,
+                                   Optional Cluster? As UShort = Nothing) As Boolean
+
+        Using Dlg As New HexViewForm(HexViewSectorData, SectorNavigator, ClusterNavigator, SyncBlocks)
+            If Cluster.HasValue Then
+                Dlg.SetStartingCluster(Cluster.Value)
+            End If
+
+            Dlg.ShowDialog(App.CurrentFormInstance)
+
+            Return Dlg.Modified
+        End Using
+    End Function
 
     Protected Overrides Sub WndProc(ByRef m As Message)
         If m.Msg = WM_CLIPBOARDUPDATE Then
@@ -122,11 +181,12 @@ Public Class HexViewForm
         Dim Sector As UInteger
 
         For Index = 0 To Length - 1
-            Sector = Disk.OffsetToSector(HexBox1.LineInfoOffset + Offset + Index)
+            Sector = _BPB.OffsetToSector(HexBox1.LineInfoOffset + Offset + Index)
             If Index = 0 Or Sector <> LastSector Then
-                SectorReadOnly = _HexViewSectorData.Disk.Image.ProtectedSectors.Contains(Sector)
+                SectorReadOnly = _HexViewSectorData.Disk.Image.IsProtectedSector(Sector)
                 LastSector = Sector
             End If
+
             Result.OriginalData(Index) = ByteProvider.ReadByte(Offset + Index)
             If Not SectorReadOnly Then
                 If Result.OriginalData(Index) <> Value Then
@@ -146,9 +206,9 @@ Public Class HexViewForm
         Dim Sector As UInteger
 
         For Index = 0 To Length - 1
-            Sector = Disk.OffsetToSector(HexBox1.LineInfoOffset + Offset + Index)
+            Sector = _BPB.OffsetToSector(HexBox1.LineInfoOffset + Offset + Index)
             If Index = 0 Or Sector <> LastSector Then
-                SectorReadOnly = _HexViewSectorData.Disk.Image.ProtectedSectors.Contains(Sector)
+                SectorReadOnly = _HexViewSectorData.Disk.Image.IsProtectedSector(Sector)
                 LastSector = Sector
             End If
 
@@ -191,16 +251,6 @@ Public Class HexViewForm
         If CloseAfterCommit Then
             Me.Close()
         End If
-    End Sub
-
-    Private Sub CopyHexToClipboard()
-        HexBox1.CopyHex()
-        'RefreshPasteButton()
-    End Sub
-
-    Private Sub CopyTextToClipboard()
-        HexBox1.Copy()
-        'RefreshPasteButton()
     End Sub
 
     Private Sub DataInspectorRefresh(ForceUpdate As Boolean)
@@ -259,13 +309,48 @@ Public Class HexViewForm
 
         If DataGridDataInspector.SelectedRows.Count > 0 Then
             Dim Row = DataGridDataInspector.SelectedRows.Item(0)
-            Dim Invalid As Boolean = Row.Cells.Item("DataGridInvalid").Value
+            Dim Invalid As Boolean = Row.Cells.Item(HexViewDataGridInspector.COLUMN_INVALID).Value
             If Not Invalid Then
                 Enabled = True
             End If
         End If
 
         BtnCopyValue.Enabled = Enabled
+    End Sub
+
+    Private Sub ApplyInspectorByteHighlight()
+        If Not DataGridDataInspector.ContainsFocus Then
+            Exit Sub
+        End If
+
+        If DataGridDataInspector.SelectedRows.Count = 0 Then
+            Exit Sub
+        End If
+
+        Dim Row = DataGridDataInspector.SelectedRows.Item(0)
+        Dim Editable As Boolean = Row.Cells.Item(HexViewDataGridInspector.COLUMN_EDITABLE).Value
+        Dim Length As Integer = Row.Cells.Item(HexViewDataGridInspector.COLUMN_LENGTH).Value
+
+        If Not Editable OrElse Row.ReadOnly OrElse Length <= 0 Then
+            RestoreInspectorByteHighlight()
+            Exit Sub
+        End If
+
+        If _CachedSelectedLength = -1 Then
+            _CachedSelectedLength = HexBox1.SelectionLength
+        End If
+
+        HexBox1.SelectionLength = Length
+    End Sub
+
+    Private Sub RestoreInspectorByteHighlight()
+        If _CachedSelectedLength = -1 Then
+            Exit Sub
+        End If
+
+        Dim CachedLength = _CachedSelectedLength
+        _CachedSelectedLength = -1
+        HexBox1.SelectionLength = CachedLength
     End Sub
 
     Private Sub DataInspectorUpdateHexBox(Value As String, DataType As DataRowEnum)
@@ -406,13 +491,13 @@ Public Class HexViewForm
 
             If _CurrentHexViewData.SectorBlock.Size > 0 Then
                 .ByteProvider = _CurrentHexViewData.ByteProvider
-                .LineInfoOffset = Disk.SectorToBytes(_CurrentHexViewData.SectorBlock.SectorStart)
+                .LineInfoOffset = _BPB.SectorToBytes(_CurrentHexViewData.SectorBlock.SectorStart)
 
                 HighlightedRegions.Sort()
 
                 Dim TotalLength As UInteger = .ByteProvider.Length
                 Dim Start As UInteger = 0
-                Dim Length = Disk.BYTES_PER_SECTOR - (Start Mod Disk.BYTES_PER_SECTOR)
+                Dim Length = _BPB.BytesPerSector - (Start Mod _BPB.BytesPerSector)
                 Dim Size As UInteger = Math.Min(Length, TotalLength - Start)
                 Dim CurrentRegion As HexViewHighlightRegion
                 Dim Index As Integer = 0
@@ -444,8 +529,8 @@ Public Class HexViewForm
                     End If
 
                     If Size > 0 Then
-                        Dim Sector = Disk.OffsetToSector(HexBox1.LineInfoOffset + Start)
-                        If _HexViewSectorData.Disk.Image.ProtectedSectors.Contains(Sector) Then
+                        Dim Sector = _BPB.OffsetToSector(HexBox1.LineInfoOffset + Start)
+                        If _HexViewSectorData.Disk.Image.IsProtectedSector(Sector) Then
                             HighlightForeColor = Color.Gray
                             HighlightBackColor = Color.White
                         End If
@@ -464,7 +549,7 @@ Public Class HexViewForm
                     End If
 
                     Start += Size
-                    Length = Disk.BYTES_PER_SECTOR - (Start Mod Disk.BYTES_PER_SECTOR)
+                    Length = _BPB.BytesPerSector - (Start Mod _BPB.BytesPerSector)
                     Size = Math.Min(Length, TotalLength - Start)
                 Loop
             End If
@@ -476,7 +561,7 @@ Public Class HexViewForm
         RefreshSelectors()
         DataGridDataInspector.ClearSelection()
 
-        ToolStripStatusBytes.Text = Format(_CurrentHexViewData.SectorBlock.Size, "N0") & " bytes"
+        ToolStripStatusBytes.Text = FormatThousands(_CurrentHexViewData.SectorBlock.Size) & " bytes"
     End Sub
     Private Sub FillSelected(Value As Byte)
         Dim ChangeList As New List(Of HexChange)
@@ -569,7 +654,7 @@ Public Class HexViewForm
             .Size = New Drawing.Size(55, 23)
         }
 
-        Dim LabelCluster = New ToolStripLabel("Cluster") With {
+        Dim LabelCluster As New ToolStripLabel(My.Resources.Label_Cluster) With {
             .Alignment = ToolStripItemAlignment.Right,
             .Padding = New Padding(12, 0, 0, 0)
         }
@@ -584,7 +669,7 @@ Public Class HexViewForm
             .Size = New Drawing.Size(55, 23)
         }
 
-        Dim LabelSector = New ToolStripLabel("Sector") With {
+        Dim LabelSector As New ToolStripLabel(My.Resources.Label_Sector) With {
             .Alignment = ToolStripItemAlignment.Right,
             .Padding = New Padding(12, 0, 0, 0)
         }
@@ -594,13 +679,13 @@ Public Class HexViewForm
     End Sub
 
     Private Sub InitializeSyncCheckBox()
-        Dim Checked = Not IsDiskFormatXDF(_HexViewSectorData.Disk.DiskFormat) AndAlso _HexViewSectorData.Disk.FATTables.FATsMatch
+        Dim Checked = Not _HexViewSectorData.Disk.DiskParams.IsXDF AndAlso _HexViewSectorData.Disk.FATTables.FATsMatch
 
         CheckBoxSync = New ToolStripCheckBox With {
             .Alignment = ToolStripItemAlignment.Right,
             .Checked = Checked,
             .Margin = New Padding(0, 3, 6, 2),
-            .Text = "Sync FATs"
+            .Text = My.Resources.Label_SyncFATs
         }
 
         ToolStripMain.Items.Add(CheckBoxSync)
@@ -608,15 +693,9 @@ Public Class HexViewForm
     End Sub
 
     Private Sub InitializeTrackNavigator()
-        ComboTrack = New ToolStripComboBox() With {
-            .Alignment = ToolStripItemAlignment.Right,
-            .DropDownStyle = ComboBoxStyle.DropDownList,
-            .AutoSize = False,
-            .FlatStyle = FlatStyle.Popup,
-            .Size = New Drawing.Size(50, 23)
-        }
+        ComboTrack = New ComboTrack()
 
-        Dim LabelTrack = New ToolStripLabel("Track") With {
+        Dim LabelTrack As New ToolStripLabel(My.Resources.Label_Track) With {
             .Alignment = ToolStripItemAlignment.Right,
             .Padding = New Padding(12, 0, 0, 0)
         }
@@ -645,7 +724,7 @@ Public Class HexViewForm
         Dim Sector = _BPB.ClusterToSector(Cluster)
 
         If Cluster > 1 And Cluster >= ClusterStart And Cluster <= ClusterEnd Then
-            Dim Offset = Disk.SectorToBytes(Sector) - HexBox1.LineInfoOffset
+            Dim Offset = _BPB.SectorToBytes(Sector) - HexBox1.LineInfoOffset
             Dim Line = Offset \ HexBox1.BytesPerLine
             HexBox1.PerformScrollToLine(Line)
             HexBox1.Select(Offset, 0)
@@ -657,7 +736,7 @@ Public Class HexViewForm
         Dim SectorEnd = SectorStart + _CurrentHexViewData.SectorBlock.SectorCount - 1
 
         If Sector >= SectorStart And Sector <= SectorEnd Then
-            Dim Offset = Disk.SectorToBytes(Sector) - HexBox1.LineInfoOffset
+            Dim Offset = _BPB.SectorToBytes(Sector) - HexBox1.LineInfoOffset
             Dim Line = Offset \ HexBox1.BytesPerLine
             HexBox1.PerformScrollToLine(Line)
             HexBox1.Select(Offset, 0)
@@ -676,7 +755,7 @@ Public Class HexViewForm
         Dim Sector = _BPB.TrackToSector(Track, Side)
 
         If Track >= TrackStart And Track <= TrackEnd Then
-            Dim Offset = Disk.SectorToBytes(Sector) - HexBox1.LineInfoOffset
+            Dim Offset = _BPB.SectorToBytes(Sector) - HexBox1.LineInfoOffset
             Dim Line = Offset \ HexBox1.BytesPerLine
             HexBox1.PerformScrollToLine(Line)
             HexBox1.Select(Offset, 0)
@@ -690,7 +769,7 @@ Public Class HexViewForm
     Private Sub PopChange(Source As Stack(Of List(Of HexChange)), Destination As Stack(Of List(Of HexChange)))
         If Source.Count > 0 Then
             Dim HexChangelist = Source.Pop()
-            Dim DestinationChangeList = New List(Of HexChange)
+            Dim DestinationChangeList As New List(Of HexChange)
 
             For Each HexChange In HexChangelist
                 Dim Data As HexViewData = CmbGroups.Items(HexChange.BlockIndex)
@@ -715,13 +794,28 @@ Public Class HexViewForm
         End If
     End Sub
 
+    Private Sub PopulateFillValues()
+        BtnFill.DropDownItems.Clear()
+        For Counter = 0 To 15
+            Dim Item As New ToolStripMenuItem(Counter.ToString("X"))
+            BtnFill.DropDownItems.Add(Item)
+            For Counter2 = 0 To 15
+                Dim Value = Counter * 16 + Counter2
+                Dim Item2 As New ToolStripMenuItem("0x" & Value.ToString("X2"), Nothing, AddressOf BtnFill_Click) With {
+                    .Tag = Value
+                }
+                Item.DropDownItems.Add(Item2)
+            Next
+        Next
+    End Sub
+
     Private Sub ProcessKeyPress(e As KeyEventArgs)
         If e.Control And e.KeyCode = Keys.C Then
             If HexBox1.CanCopy Then
                 If e.Shift Then
-                    CopyHexFormatted(HexBox1)
+                    CopyHex(HexBox1, True)
                 Else
-                    CopyHexToClipboard()
+                    CopyHex(HexBox1, False)
                 End If
             End If
             e.SuppressKeyPress = True
@@ -738,7 +832,7 @@ Public Class HexViewForm
             End If
             e.SuppressKeyPress = True
         ElseIf e.KeyCode = Keys.Down Then
-            Dim LineCount = Math.Ceiling(HexBox1.ByteProvider.Length / HexBox1.HorizontalByteCount)
+            Dim LineCount = CeilDiv(CULng(HexBox1.ByteProvider.Length), CULng(HexBox1.HorizontalByteCount))
             If HexBox1.CurrentLine >= LineCount Then
                 If CmbGroups.SelectedIndex < CmbGroups.Items.Count - 1 Then
                     Dim Offset = HexBox1.SelectionStart Mod HexBox1.HorizontalByteCount
@@ -829,6 +923,7 @@ Public Class HexViewForm
             Exit Sub
         End If
 
+        Dim FileCaption As String = My.Resources.Label_File
         Dim SelectionStart = HexBox1.SelectionStart
         Dim SelectionLength = HexBox1.SelectionLength
         Dim SelectionEnd = SelectionStart + SelectionLength - 1
@@ -842,29 +937,31 @@ Public Class HexViewForm
             ToolStripStatusTrack.Visible = False
             ToolStripStatusSide.Visible = False
             ToolStripStatusTrackSector.Visible = False
-            BtnSelectSector.Text = "Select &Sector"
+            BtnSelectSector.Text = My.Resources.Menu_SelectSector
             BtnSelectSector.Enabled = False
-            ToolStripBtnSelectSector.Text = "Sector"
-            ToolStripBtnSelectSector.ToolTipText = "Select Sector"
+            ToolStripBtnSelectSector.Text = My.Resources.Label_Sector
+            ToolStripBtnSelectSector.ToolTipText = WithoutHotkey(My.Resources.Menu_SelectSector)
             ToolStripBtnSelectSector.Enabled = BtnSelectSector.Enabled
-            BtnSelectTrack.Text = "Select T&rack"
+            BtnSelectTrack.Text = My.Resources.Menu_SelectTrack
             BtnSelectTrack.Enabled = False
-            ToolStripBtnSelectTrack.Text = "Track"
-            ToolStripBtnSelectTrack.ToolTipText = "Select Track"
+            ToolStripBtnSelectTrack.Text = My.Resources.Label_Track
+            ToolStripBtnSelectTrack.ToolTipText = WithoutHotkey(My.Resources.Menu_SelectTrack)
             ToolStripBtnSelectTrack.Enabled = BtnSelectTrack.Enabled
-            _DataGridInspector.SetDataRow(DataRowEnum.File, Nothing, True, True)
+            _DataGridInspector.SetDataRow(DataRowEnum.Area, Nothing, True, True)
+            _DataGridInspector.SetDataRow(DataRowEnum.File, Nothing, True, True, FileCaption)
         Else
             Dim OffsetStart As UInteger = HexBox1.LineInfoOffset + SelectionStart
             Dim OffsetEnd As Integer = HexBox1.LineInfoOffset + SelectionEnd
+            Dim AreaName As String = ""
             Dim FileName As String = ""
             Dim OutOfRange As Boolean = SelectionStart >= HexBox1.ByteProvider.Length
 
-            Dim Sector = Disk.OffsetToSector(OffsetStart)
+            Dim Sector = _BPB.OffsetToSector(OffsetStart)
 
-            HexBox1.ReadOnly = _HexViewSectorData.Disk.Image.ProtectedSectors.Contains(Sector)
+            HexBox1.ReadOnly = _HexViewSectorData.Disk.Image.IsProtectedSector(Sector)
 
             ToolStripStatusOffset.Visible = Not OutOfRange
-            ToolStripStatusOffset.Text = "Offset(h) :  " & OffsetStart.ToString("X")
+            ToolStripStatusOffset.Text = FormatLabelPair(My.Resources.Label_OffsetHex, OffsetStart.ToString("X"), " :  ")
 
             If SelectionLength = 0 Then
                 ToolStripStatusBlock.Visible = False
@@ -873,9 +970,9 @@ Public Class HexViewForm
                 ToolStripStatusLength.Text = ""
             Else
                 ToolStripStatusBlock.Visible = True
-                ToolStripStatusBlock.Text = "Block(h): " & OffsetStart.ToString("X") & "-" & OffsetEnd.ToString("X")
+                ToolStripStatusBlock.Text = FormatLabelPair(My.Resources.Label_BlockHex, OffsetStart.ToString("X") & "-" & OffsetEnd.ToString("X"))
                 ToolStripStatusLength.Visible = True
-                ToolStripStatusLength.Text = "Length(h): " & SelectionLength.ToString("X") & "  (" & SelectionLength & ")"
+                ToolStripStatusLength.Text = FormatLabelPair(My.Resources.Label_LengthHex, SelectionLength.ToString("X") & "  " & InParens(SelectionLength))
             End If
 
             If _CurrentSector <> Sector Or ForceUpdate Then
@@ -887,32 +984,40 @@ Public Class HexViewForm
                 End If
 
                 ToolStripStatusSector.Visible = Not OutOfRange
-                ToolStripStatusSector.Text = "Sector: " & Sector
+                ToolStripStatusSector.Text = FormatLabelPair(My.Resources.Label_Sector, Sector)
                 If Cluster < 2 Then
                     ToolStripStatusCluster.Visible = False
                     ToolStripStatusCluster.Text = ""
                 Else
                     ToolStripStatusCluster.Visible = Not OutOfRange
-                    ToolStripStatusCluster.Text = "Cluster: " & Cluster
-
-                    If _BPB.IsValid Then
-                        If _CurrentHexViewData.Disk.RootDirectory.FATAllocation.FileAllocation.ContainsKey(Cluster) Then
-                            Dim OffsetList = _CurrentHexViewData.Disk.RootDirectory.FATAllocation.FileAllocation.Item(Cluster)
-                            Dim DirectoryEntry = OffsetList.Item(0)
-                            FileName = DirectoryEntry.GetShortFileName(True)
-                        End If
-                    End If
+                    ToolStripStatusCluster.Text = FormatLabelPair(My.Resources.Label_Cluster, Cluster)
                 End If
 
                 If _BPB.IsValid Then
+                    Dim Region = GetFloppyDiskRegionName(_CurrentHexViewData.Disk, Sector, Cluster)
+                    AreaName = Region.AreaName
+
+                    If Cluster > 1 Then
+                        Dim DirectoryEntry = GetDirectoryEntryFromCluster(_CurrentHexViewData.Disk, Cluster)
+                        If DirectoryEntry IsNot Nothing Then
+                            FileName = DirectoryEntry.GetShortFileName(True)
+                            If DirectoryEntry.IsDirectory Then
+                                FileCaption = My.Resources.Label_Directory
+                            End If
+                        End If
+                    End If
+
                     ToolStripStatusTrack.Visible = Not OutOfRange
-                    ToolStripStatusTrack.Text = "Track: " & _BPB.SectorToTrack(Sector)
+                    ToolStripStatusTrack.Text = FormatLabelPair(My.Resources.Label_Track, _BPB.SectorToTrack(Sector))
 
                     ToolStripStatusSide.Visible = Not OutOfRange
-                    ToolStripStatusSide.Text = "Side: " & _BPB.SectorToSide(Sector)
+                    ToolStripStatusSide.Text = FormatLabelPair(My.Resources.Label_Side, _BPB.SectorToSide(Sector))
 
                     ToolStripStatusTrackSector.Visible = Not OutOfRange
-                    ToolStripStatusTrackSector.Text = "Sector Id: " & _BPB.SectorToTrackSector(Sector) + 1
+                    ToolStripStatusTrackSector.Text = FormatLabelPair(My.Resources.Label_SectorId, _BPB.SectorToTrackSector(Sector) + 1)
+
+                    Dim IsTranslated = _HexViewSectorData.Disk.Image.IsTranslatedSector(Sector)
+                    ToolStripStatusTranslated.Text = If(IsTranslated, "  T", "")
                 Else
                     ToolStripStatusTrack.Visible = False
                     ToolStripStatusTrack.Text = ""
@@ -922,18 +1027,26 @@ Public Class HexViewForm
 
                     ToolStripStatusTrackSector.Visible = False
                     ToolStripStatusTrackSector.Text = ""
+
+                    ToolStripStatusTranslated.Text = ""
                 End If
 
                 If FileName.Length = 0 Or OutOfRange Then
-                    _DataGridInspector.SetDataRow(DataRowEnum.File, Nothing, True, True)
+                    _DataGridInspector.SetDataRow(DataRowEnum.File, Nothing, True, True, FileCaption)
                 Else
-                    _DataGridInspector.SetDataRow(DataRowEnum.File, FileName, True, True)
+                    _DataGridInspector.SetDataRow(DataRowEnum.File, FileName, True, True, FileCaption)
                 End If
 
-                BtnSelectSector.Text = "Select &Sector " & Sector
+                If AreaName.Length = 0 Or OutOfRange Then
+                    _DataGridInspector.SetDataRow(DataRowEnum.Area, Nothing, True, True)
+                Else
+                    _DataGridInspector.SetDataRow(DataRowEnum.Area, AreaName, True, True)
+                End If
+
+                BtnSelectSector.Text = My.Resources.Menu_SelectSector & " " & Sector
                 BtnSelectSector.Enabled = Not OutOfRange
-                ToolStripBtnSelectSector.Text = "Sector " & Sector
-                ToolStripBtnSelectSector.ToolTipText = "Select Sector " & Sector
+                ToolStripBtnSelectSector.Text = My.Resources.Label_Sector & " " & Sector
+                ToolStripBtnSelectSector.ToolTipText = WithoutHotkey(My.Resources.Menu_SelectSector) & " " & Sector
                 ToolStripBtnSelectSector.Enabled = BtnSelectSector.Enabled
 
                 If _BPB.IsValid Then
@@ -941,10 +1054,10 @@ Public Class HexViewForm
                     Dim Side = _BPB.SectorToSide(Sector)
                     Dim Value = Track.ToString & "." & Side.ToString
 
-                    BtnSelectTrack.Text = "Select T&rack " & Value
+                    BtnSelectTrack.Text = My.Resources.Menu_SelectTrack & " " & Value
                     BtnSelectTrack.Enabled = _ClusterNavigator And Not OutOfRange
-                    ToolStripBtnSelectTrack.Text = "Track " & Value
-                    ToolStripBtnSelectTrack.ToolTipText = "Select Track " & Value
+                    ToolStripBtnSelectTrack.Text = My.Resources.Label_Track & " " & Value
+                    ToolStripBtnSelectTrack.ToolTipText = WithoutHotkey(My.Resources.Menu_SelectTrack) & " " & Value
                     ToolStripBtnSelectTrack.Enabled = BtnSelectTrack.Enabled
                 End If
 
@@ -1003,6 +1116,8 @@ Public Class HexViewForm
         BtnFillF6.Enabled = HexBox1.SelectionLength > 0
         ToolStripBtnFillF6.Enabled = BtnFillF6.Enabled
 
+        BtnFill.Enabled = HexBox1.SelectionLength > 0
+
         RefreshPasteButton()
         RefreshUndoButtons()
 
@@ -1047,7 +1162,7 @@ Public Class HexViewForm
                 Dim TrackEnd = _BPB.SectorToTrack(SectorEnd)
                 For i = TrackStart To TrackEnd
                     For j = 0 To _BPB.NumberOfHeads - 1
-                        ComboTrack.Items.Add(i & "." & j)
+                        ComboTrack.Items.Add($"{i}.{j}")
                     Next
                 Next
                 ComboTrack.SelectedIndex = 0
@@ -1064,7 +1179,7 @@ Public Class HexViewForm
         End If
 
         Dim Offset = HexBox1.LineInfoOffset + HexBox1.StartByte
-        Dim Sector = Disk.OffsetToSector(Offset)
+        Dim Sector = _BPB.OffsetToSector(Offset)
 
         _IgnoreEvent = True
 
@@ -1103,11 +1218,9 @@ Public Class HexViewForm
         If FindNext And _LastSearch.SearchString <> "" Then
             Result = SearchNext(_LastSearch)
         Else
-            Dim frmHexSearchForm As New HexSearchForm(_LastSearch)
-            frmHexSearchForm.ShowDialog()
-
-            If frmHexSearchForm.DialogResult = DialogResult.OK Then
-                _LastSearch = frmHexSearchForm.Search
+            Dim Response = HexSearchForm.Display(_LastSearch)
+            If Response.Result Then
+                _LastSearch = Response.Search
                 Result = SearchNext(_LastSearch)
             End If
         End If
@@ -1118,7 +1231,7 @@ Public Class HexViewForm
             HexBox1.PerformScrollToLine(TopLine)
             HexBox1.SelectionStart = SelectionStart
             HexBox1.SelectionLength = SelectionLength
-            MsgBox("Can't Find '" & _LastSearch.SearchString & "'", MsgBoxStyle.Information)
+            MsgBox(String.Format(My.Resources.Dialog_SearchNotFound, _LastSearch.SearchString), MsgBoxStyle.Information)
         Else
             RefreshSelection(False)
             DataInspectorRefresh(False)
@@ -1167,8 +1280,13 @@ Public Class HexViewForm
 
         Dim OutOfRange As Boolean = HexBox1.SelectionStart >= HexBox1.ByteProvider.Length
         If Not OutOfRange Then
-            Dim Offset = Disk.SectorToBytes(_CurrentSector) - HexBox1.LineInfoOffset
-            Dim Length = Disk.BYTES_PER_SECTOR
+            Dim Offset = _BPB.SectorToBytes(_CurrentSector) - HexBox1.LineInfoOffset
+            Dim Length = _BPB.BytesPerSector
+
+            If Offset + Length > HexBox1.ByteProvider.Length Then
+                Length = HexBox1.ByteProvider.Length - Offset
+            End If
+
             HexBox1.Select(Offset, Length)
         End If
     End Sub
@@ -1179,8 +1297,13 @@ Public Class HexViewForm
             Dim Track = _BPB.SectorToTrack(_CurrentSector)
             Dim Side = _BPB.SectorToSide(_CurrentSector)
             Dim Sector = _BPB.TrackToSector(Track, Side)
-            Dim Offset = Disk.SectorToBytes(Sector) - HexBox1.LineInfoOffset
-            Dim Length = Disk.BYTES_PER_SECTOR * _BPB.SectorsPerTrack
+            Dim Offset = _BPB.SectorToBytes(Sector) - HexBox1.LineInfoOffset
+            Dim Length = _BPB.BytesPerSector * _BPB.SectorsPerTrack
+
+            If Offset + Length > HexBox1.ByteProvider.Length Then
+                Length = HexBox1.ByteProvider.Length - Offset
+            End If
+
             HexBox1.Select(Offset, Length)
         End If
     End Sub
@@ -1199,19 +1322,19 @@ Public Class HexViewForm
 
     Private Sub BtnCopyHex_Click(sender As Object, e As EventArgs) Handles BtnCopyHex.Click, ToolStripBtnCopyHex.Click
         If HexBox1.CanCopy Then
-            CopyHexToClipboard()
+            CopyHex(HexBox1, False)
         End If
     End Sub
 
     Private Sub BtnCopyHexFormatted_Click(sender As Object, e As EventArgs) Handles BtnCopyHexFormatted.Click, ToolStripBtnCopyHexFormatted.Click
         If HexBox1.CanCopy Then
-            CopyHexFormatted(HexBox1)
+            CopyHex(HexBox1, True)
         End If
     End Sub
 
     Private Sub BtnCopyText_Click(sender As Object, e As EventArgs) Handles BtnCopyText.Click, ToolStripBtnCopyText.Click
         If HexBox1.CanCopy Then
-            CopyTextToClipboard()
+            HexBox1.Copy()
         End If
     End Sub
 
@@ -1222,6 +1345,13 @@ Public Class HexViewForm
     Private Sub BtnDelete_Click(sender As Object, e As EventArgs) Handles BtnDelete.Click, ToolStripBtnDelete.Click
         If HexBox1.SelectionLength > 0 Then
             FillSelected(0)
+        End If
+    End Sub
+
+    Private Sub BtnFill_Click(sender As Object, e As EventArgs)
+        If HexBox1.SelectionLength > 0 Then
+            Dim Value As Byte = sender.tag
+            FillSelected(Value)
         End If
     End Sub
 
@@ -1281,37 +1411,40 @@ Public Class HexViewForm
 
     Private Sub DataGridDataInspector_CellBeginEdit(sender As Object, e As DataGridViewCellCancelEventArgs) Handles DataGridDataInspector.CellBeginEdit
         Dim Row = DataGridDataInspector.Rows(e.RowIndex)
-        Dim Invalid As Boolean = Row.Cells.Item("DataGridInvalid").Value
-        Dim Editable As Boolean = Row.Cells.Item("DataGridEditable").Value
-        Dim Length As Integer = Row.Cells.Item("DataGridLength").Value
+        Dim Editable As Boolean = Row.Cells.Item(HexViewDataGridInspector.COLUMN_EDITABLE).Value
 
         If Not Editable Then
             e.Cancel = True
             Exit Sub
         End If
 
-        _CachedSelectedLength = HexBox1.SelectionLength
-        HexBox1.SelectionLength = Length
-
-        _StoredCellValue = Row.Cells.Item("DataGridValue").Value
+        _StoredCellValue = Row.Cells.Item(HexViewDataGridInspector.COLUMN_VALUE).Value
     End Sub
 
     Private Sub DataGridDataInspector_CellEndEdit(sender As Object, e As DataGridViewCellEventArgs) Handles DataGridDataInspector.CellEndEdit
         Dim Row = DataGridDataInspector.Rows(e.RowIndex)
-        Dim CellValue As String = Row.Cells.Item("DataGridValue").Value
-        Dim DataType As DataRowEnum = Row.Cells.Item("DataGridType").Value
+        Dim CellValue As String = Row.Cells.Item(HexViewDataGridInspector.COLUMN_VALUE).Value
+        Dim DataType As DataRowEnum = Row.Cells.Item(HexViewDataGridInspector.COLUMN_TYPE).Value
 
         If CellValue <> _StoredCellValue Then
             _CachedSelectedLength = -1
             DataInspectorUpdateHexBox(CellValue, DataType)
-        Else
-            HexBox1.SelectionLength = _CachedSelectedLength
-            _CachedSelectedLength = -1
         End If
+    End Sub
+
+    Private Sub DataGridDataInspector_Enter(sender As Object, e As EventArgs) Handles DataGridDataInspector.Enter
+        ApplyInspectorByteHighlight()
+    End Sub
+
+    Private Sub DataGridDataInspector_Leave(sender As Object, e As EventArgs) Handles DataGridDataInspector.Leave
+        RestoreInspectorByteHighlight()
     End Sub
 
     Private Sub DataGridDataInspector_SelectionChanged(sender As Object, e As EventArgs) Handles DataGridDataInspector.SelectionChanged
         DataInspectorRefreshButtons()
+        If DataGridDataInspector.ContainsFocus Then
+            ApplyInspectorByteHighlight()
+        End If
     End Sub
 
     Private Sub HexBox1_ByteChanged(source As Object, e As HexBox.ByteChangedArgs) Handles HexBox1.ByteChanged
@@ -1382,34 +1515,22 @@ Public Class HexViewForm
         End If
     End Sub
 
-    Private Sub HexBox1_AfterPaint(sender As Object, e As PaintEventArgs) Handles HexBox1.AfterPaint
-        Const LeftPos As Integer = 630
-        Dim RowHeight As Integer = HexBox1.Font.Height
-        Dim TopPos As Integer = RowHeight + 5
-        Dim LineCount = HexBox1.VerticalByteCount
-        Dim StartOffset = HexBox1.LineInfoOffset + HexBox1.StartByte
-        Dim Offset As Long
+    Private Sub HexBox1_FormatSectorLabel(sender As Object, e As HexBox.FormatSectorLabelEventArgs) Handles HexBox1.FormatSectorLabel
+        If _BPB.IsValid Then
+            Dim Sector = CUInt(e.Sector)
+            Dim Track = _BPB.SectorToTrack(Sector)
+            Dim Side = _BPB.SectorToSide(Sector)
+            Dim SectorId = _BPB.SectorToTrackSector(Sector) + 1
 
-        For Counter = 0 To LineCount - 2
-            Offset = StartOffset + Counter * HexBox1.BytesPerLine
-            If Offset Mod 512 = 0 Then
-                Dim Sector = Disk.OffsetToSector(Offset)
-                Dim Track = _BPB.SectorToTrack(Sector)
-                Dim Side = _BPB.SectorToSide(Sector)
-                Dim SectorId = _BPB.SectorToTrackSector(Sector) + 1
-                Dim vPos = TopPos + Counter * RowHeight
-                If Counter > 0 Then
-                    e.Graphics.DrawLine(Pens.DarkGray, 0, vPos, e.ClipRectangle.Width, vPos)
-                End If
-                Dim r As New Rectangle(LeftPos, vPos, 64, RowHeight)
-                e.Graphics.DrawString(Track & "." & Side & "-" & SectorId, HexBox1.Font, Brushes.DarkGray, r, StringFormat.GenericDefault)
-            End If
-        Next
+            e.Text = Track & "." & Side & "-" & SectorId
+        Else
+            e.Text = e.Sector.ToString()
+        End If
     End Sub
 
     Private Sub HexViewForm_Closing(sender As Object, e As CancelEventArgs) Handles Me.Closing
         If _Changes.Count > 0 And Not _Modified Then
-            Dim Msg As String = "Changes have been made to this disk image." & vbCrLf & vbCrLf & "Do you wish to commit these changes before closing this window?"
+            Dim Msg = String.Format(My.Resources.Dialog_CommitChanges, Environment.NewLine)
             Dim Response = MsgBox(Msg, MsgBoxStyle.Question + MsgBoxStyle.YesNoCancel + MsgBoxStyle.DefaultButton3)
             If Response = MsgBoxResult.Cancel Then
                 e.Cancel = True
@@ -1480,6 +1601,10 @@ Public Class HexViewForm
 
     Private Sub ToolStripMain_ItemClicked(sender As Object, e As ToolStripItemClickedEventArgs) Handles ToolStripMain.ItemClicked
         HexBox1.Focus()
+    End Sub
+
+    Private Sub HexViewForm_Shown(sender As Object, e As EventArgs) Handles Me.Shown
+        Me.ActiveControl = HexBox1
     End Sub
 
     'Private Sub GroupBoxByteOrder_Resize(sender As Object, e As EventArgs) Handles GroupBoxByteOrder.Resize

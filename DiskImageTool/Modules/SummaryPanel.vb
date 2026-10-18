@@ -1,0 +1,1096 @@
+﻿Imports System.Collections.Specialized
+Imports System.ComponentModel
+Imports DiskImageTool.DiskImage
+Imports BootSectorOffsets = DiskImageTool.DiskImage.BootSector.BootSectorOffsets
+Imports BPBOffsets = DiskImageTool.DiskImage.BiosParameterBlock.BPBOoffsets
+
+Public Class SummaryPanel
+    Private WithEvents ContextMenuCopy As ContextMenuStrip
+    Private WithEvents ListViewSummary As ListView
+    Private Const COLUMN_WIDTH_NAME As Integer = 124
+    Private Const CONTEXT_MENU_SUMMARY_KEY As String = "Summary"
+    Private Const GROUP_BOOTRECORD As String = "BootRecord"
+    Private Const GROUP_BOOTSTRAP As String = "Bootstrap"
+    Private Const GROUP_DISK As String = "Disk"
+    Private Const GROUP_FILE_SYSTEM As String = "FileSystem"
+    Private Const GROUP_IMAGE As String = "Image"
+    Private Const GROUP_TITLE As String = "Title"
+    Private Const NULL_CHAR As Char = "�"
+    Private Column_Width_Value As Integer = 0
+    Private ReadOnly CollapsedGroups As New HashSet(Of String)
+    Private GroupDblClickFilter As ListViewGroupDblClickFilter
+    Private TitleRows As OrderedDictionary = Nothing
+
+    Public Sub New(ListViewSummary As ListView)
+        Me.ListViewSummary = ListViewSummary
+
+        Initialize()
+
+        ContextMenuCopy = New ContextMenuStrip With {
+            .Name = CONTEXT_MENU_SUMMARY_KEY
+        }
+        Dim Item = ContextMenuCopy.Items.Add(My.Resources.Menu_CopyValue)
+        Item.Name = "CopyValue"
+
+        Me.ListViewSummary.ContextMenuStrip = ContextMenuCopy
+    End Sub
+
+    Protected Overrides Sub Finalize()
+        MyBase.Finalize()
+
+        ListViewSummary = Nothing
+        ContextMenuCopy = Nothing
+    End Sub
+
+    Public Sub Clear()
+        ListViewSummary.Items.Clear()
+    End Sub
+
+    Public Sub Populate(CurrentImage As DiskImageContainer, BootStrapDB As BootstrapDB, Optional TitleDB As FloppyDB.FloppyDB = Nothing, Optional MD5 As String = Nothing, Optional Preview As Boolean = False)
+        With ListViewSummary
+            SnapshotCollapsedGroups()
+
+            .BeginUpdate()
+            .Items.Clear()
+            .Groups.Clear()
+
+            .Columns.Item(0).Width = COLUMN_WIDTH_NAME
+            .Columns.Item(1).Width = Column_Width_Value
+
+            If CurrentImage.Disk IsNot Nothing Then
+                PopulateMain(CurrentImage.Disk, BootStrapDB, TitleDB, MD5, Preview)
+
+                .HideSelection = False
+                .TabStop = True
+            Else
+                PopulateError(CurrentImage.ImageData.InvalidImage)
+
+                .HideSelection = True
+                .TabStop = False
+            End If
+
+            ApplyCollapsedGroups()
+            .EndUpdate()
+            .Refresh()
+        End With
+    End Sub
+
+    Private Function GetBitRateColor(BitRate As Integer, Format As FloppyDiskFormat) As Color
+        Dim ForeColor = SystemColors.WindowText
+
+        BitRate = Bitstream.RoundBitRate(BitRate)
+
+        Select Case Format
+            Case FloppyDiskFormat.Floppy160, FloppyDiskFormat.Floppy180, FloppyDiskFormat.Floppy320, FloppyDiskFormat.Floppy360
+                If BitRate = 300 Then
+                    ForeColor = Color.Blue
+                ElseIf BitRate <> 250 Then
+                    ForeColor = Color.Red
+                End If
+            Case FloppyDiskFormat.Floppy720, FloppyDiskFormat.FloppyTandy2000
+                If BitRate <> 250 Then
+                    ForeColor = Color.Red
+                End If
+            Case FloppyDiskFormat.Floppy2880
+                If BitRate <> 1000 Then
+                    ForeColor = Color.Red
+                End If
+            Case FloppyDiskFormat.FloppyUnknown, FloppyDiskFormat.FloppyNoBPB
+                '
+            Case Else
+                If BitRate <> 500 Then
+                    ForeColor = Color.Red
+                End If
+        End Select
+
+        Return ForeColor
+    End Function
+
+    Public Shared Function GetFileSystemInfo(Disk As Disk) As FileSystemInfo
+        Dim fsi As FileSystemInfo
+
+        fsi.OldestFileDate = Nothing
+        fsi.NewestFileDate = Nothing
+        fsi.VolumeLabel = Nothing
+
+        Dim FileList = Disk.RootDirectory.GetFileList()
+
+        For Each DirectoryEntry In FileList
+            If DirectoryEntry.IsValid Then
+                If fsi.VolumeLabel Is Nothing AndAlso DirectoryEntry.IsValidVolumeName AndAlso DirectoryEntry.ParentDirectory.IsRootDirectory Then
+                    fsi.VolumeLabel = DirectoryEntry
+                End If
+                Dim LastWriteDate = DirectoryEntry.GetLastWriteDate
+                If LastWriteDate.IsValidDate Then
+                    If fsi.OldestFileDate Is Nothing Then
+                        fsi.OldestFileDate = LastWriteDate.DateObject
+                    ElseIf fsi.OldestFileDate.Value.CompareTo(LastWriteDate.DateObject) > 0 Then
+                        fsi.OldestFileDate = LastWriteDate.DateObject
+                    End If
+                    If fsi.NewestFileDate Is Nothing Then
+                        fsi.NewestFileDate = LastWriteDate.DateObject
+                    ElseIf fsi.NewestFileDate.Value.CompareTo(LastWriteDate.DateObject) < 0 Then
+                        fsi.NewestFileDate = LastWriteDate.DateObject
+                    End If
+                End If
+            End If
+        Next
+
+        Return fsi
+    End Function
+
+    Private Function GetFocusedItemMetadata() As SummaryMetadata
+        If ListViewSummary Is Nothing OrElse ListViewSummary.FocusedItem Is Nothing Then
+            Return Nothing
+        End If
+
+        Dim Item = ListViewSummary.FocusedItem
+        Dim Metadata = TryCast(Item.Tag, SummaryMetadata)
+
+        Return Metadata
+    End Function
+
+    Private Shared Function GetNonStandardTrackList(NonStandardTracks As HashSet(Of UShort), HeadCount As Byte) As String
+        Dim TrackList(NonStandardTracks.Count - 1) As UShort
+        Dim TrackStartString As String
+        Dim TrackEndString As String
+        Dim Separator As String
+
+        Dim i As UShort = 0
+        For Each Track In NonStandardTracks
+            TrackList(i) = Track
+            i += 1
+        Next
+
+        Array.Sort(TrackList)
+
+        Dim Result As New List(Of String)
+        Dim StartRange As UShort = TrackList(0)
+        Dim Prev As UShort = TrackList(0)
+
+        For i = 1 To TrackList.Length - 1
+            If TrackList(i) = Prev + 1 Then
+                Prev = TrackList(i)
+            Else
+                TrackStartString = (StartRange \ HeadCount) & "." & (StartRange Mod HeadCount)
+                If StartRange = Prev Then
+                    Result.Add(TrackStartString)
+                Else
+                    TrackEndString = (Prev \ HeadCount) & "." & (Prev Mod HeadCount)
+                    If Prev = StartRange + 1 Then
+                        Separator = ", "
+                    Else
+                        Separator = " - "
+                    End If
+                    Result.Add(TrackStartString & Separator & TrackEndString)
+                End If
+                StartRange = TrackList(i)
+                Prev = StartRange
+            End If
+        Next
+
+        TrackStartString = (StartRange \ HeadCount) & "." & (StartRange Mod HeadCount)
+        If StartRange = Prev Then
+            Result.Add(TrackStartString)
+        Else
+            TrackEndString = (Prev \ HeadCount) & "." & (Prev Mod HeadCount)
+            If Prev = StartRange + 1 Then
+                Separator = ", "
+            Else
+                Separator = " - "
+            End If
+            Result.Add(TrackStartString & Separator & TrackEndString)
+        End If
+
+        Return String.Join(", ", Result)
+    End Function
+
+    Private Function GetRPMColor(RPM As Integer, Format As FloppyDiskFormat) As Color
+        Dim ForeColor = SystemColors.WindowText
+
+        Select Case Format
+            Case FloppyDiskFormat.Floppy160, FloppyDiskFormat.Floppy180, FloppyDiskFormat.Floppy320, FloppyDiskFormat.Floppy360
+                If RPM = 360 Then
+                    ForeColor = Color.Blue
+                ElseIf RPM <> 300 Then
+                    ForeColor = Color.Red
+                End If
+            Case FloppyDiskFormat.Floppy1200
+                If RPM <> 360 Then
+                    ForeColor = Color.Red
+                End If
+            Case FloppyDiskFormat.FloppyUnknown, FloppyDiskFormat.FloppyNoBPB
+                'Return True'
+            Case Else
+                If RPM <> 300 Then
+                    ForeColor = Color.Red
+                End If
+        End Select
+
+        Return ForeColor
+    End Function
+
+    Private Sub Initialize()
+        With ListViewSummary
+            .FullRowSelect = True
+            .View = View.Details
+            .HeaderStyle = ColumnHeaderStyle.None
+            .HideSelection = False
+            .MultiSelect = False
+            .OwnerDraw = True
+            .DoubleBuffer
+            .AutoResizeColumnsContstrained(ColumnHeaderAutoResizeStyle.None)
+            .Items.Clear()
+            .Columns.Clear()
+            .Columns.Add("", COLUMN_WIDTH_NAME, HorizontalAlignment.Left)
+            Column_Width_Value = .ClientSize.Width - COLUMN_WIDTH_NAME - SystemInformation.VerticalScrollBarWidth
+            .Columns.Add("", Column_Width_Value, HorizontalAlignment.Left)
+        End With
+
+        GroupDblClickFilter = New ListViewGroupDblClickFilter(ListViewSummary)
+    End Sub
+
+    Private Sub SnapshotCollapsedGroups()
+        If ListViewSummary.Groups.Count = 0 Then
+            Exit Sub
+        End If
+
+        For Each Group As ListViewGroup In ListViewSummary.Groups
+            If String.IsNullOrEmpty(Group.Name) Then
+                Continue For
+            End If
+
+            If ListViewSummary.IsGroupCollapsed(Group) Then
+                CollapsedGroups.Add(Group.Name)
+            Else
+                CollapsedGroups.Remove(Group.Name)
+            End If
+        Next
+    End Sub
+
+    Private Sub ApplyCollapsedGroups()
+        ListViewSummary.SetGroupsCollapsible()
+
+        For Each Group As ListViewGroup In ListViewSummary.Groups
+            If CollapsedGroups.Contains(Group.Name) Then
+                ListViewSummary.SetGroupCollapsed(Group, True)
+            End If
+        Next
+    End Sub
+
+    Private Sub InitializeTitleRows()
+        If TitleRows Is Nothing Then
+            TitleRows = New OrderedDictionary
+        End If
+
+        TitleRows.Clear()
+
+        TitleRows.Add("Name", New SummaryRow(ListViewSummary.Font, My.Resources.SummaryPanel_Title, True, True))
+        TitleRows.Add("Variation", New SummaryRow(ListViewSummary.Font, My.Resources.SummaryPanel_Variant, False, False))
+        TitleRows.Add("Compilation", New SummaryRow(ListViewSummary.Font, My.Resources.SummaryPanel_Compilation, True, False))
+        TitleRows.Add("Publisher", New SummaryRow(ListViewSummary.Font, My.Resources.SummaryPanel_Publisher, True, False))
+        TitleRows.Add("Series", New SummaryRow(ListViewSummary.Font, My.Resources.SummaryPanel_Series, True, False))
+        TitleRows.Add("Year", New SummaryRow(ListViewSummary.Font, My.Resources.SummaryPanel_Year, False, False))
+        TitleRows.Add("Platform", New SummaryRow(ListViewSummary.Font, My.Resources.SummaryPanel_Platform, False, False))
+        TitleRows.Add("Region", New SummaryRow(ListViewSummary.Font, My.Resources.Label_Region, False, False))
+        TitleRows.Add("Language", New SummaryRow(ListViewSummary.Font, My.Resources.Label_Language, True, False))
+        TitleRows.Add("Version", New SummaryRow(ListViewSummary.Font, My.Resources.Label_Version, True, False))
+        TitleRows.Add("Disk", New SummaryRow(ListViewSummary.Font, My.Resources.Label_Disk, True, False))
+        TitleRows.Add("CopyProtection", New SummaryRow(ListViewSummary.Font, My.Resources.SummaryPanel_CopyProtection, True, True))
+        TitleRows.Add("TDC", New SummaryRow(ListViewSummary.Font, My.Resources.Label_TDC, True, False))
+        TitleRows.Add("TGOD", New SummaryRow(ListViewSummary.Font, My.Resources.Label_TGOD, True, False))
+    End Sub
+
+    Private Sub PopulateError(InvalidImage As Boolean)
+        With ListViewSummary
+            Dim DiskGroup = .Groups.Add(GROUP_DISK, My.Resources.Label_Disk)
+            Dim Msg As String
+
+            If InvalidImage Then
+                Msg = My.Resources.SummaryPanel_InvalidFormat
+            Else
+                Msg = My.Resources.SummaryPanel_Error
+            End If
+
+            Dim Item As New ListViewItem("  " & Msg, DiskGroup) With {
+                .ForeColor = Color.Red
+            }
+            .Items.Add(Item)
+        End With
+    End Sub
+
+    Private Sub PopulateGroup(Group As ListViewGroup, Rows As OrderedDictionary)
+        Const PaddingRight As Integer = 15
+        Dim MaxColumnWidth As Integer = 55
+
+
+        With Group.ListView
+            For Each SummaryRow As SummaryRow In Rows.Values
+                If SummaryRow.Value <> "" Then
+                    MaxColumnWidth = Math.Max(MaxColumnWidth, SummaryRow.TextWidth)
+                End If
+            Next
+
+            Dim Diff = .Columns.Item(0).Width - MaxColumnWidth
+            Dim ColumnWidth As Integer = .Columns.Item(1).Width - PaddingRight
+            Dim MaxWidth = ColumnWidth + Diff
+
+            For Each SummaryRow As SummaryRow In Rows.Values
+                If SummaryRow.Value <> "" Then
+                    Dim Item As ListViewItem
+                    If SummaryRow.AutoResize Then
+                        Item = .AddItem(Group, SummaryRow.Text, SummaryRow.Value, SummaryRow.ForeColor, SummaryRow.WrapText, MaxWidth)
+                    Else
+                        Item = .AddItem(Group, SummaryRow.Text, SummaryRow.Value, SummaryRow.ForeColor, SummaryRow.WrapText)
+                    End If
+                    If SummaryRow.MobyGamesId <> "" Then
+                        Dim Metadata = TryCast(Item.Tag, SummaryMetadata)
+                        If Metadata IsNot Nothing Then
+                            Metadata.MobyGamesId = SummaryRow.MobyGamesId
+                        End If
+                    End If
+                    If SummaryRow.TGOD <> "" Then
+                        Dim Metadata = TryCast(Item.Tag, SummaryMetadata)
+                        If Metadata IsNot Nothing Then
+                            Metadata.TGOD = SummaryRow.TGOD
+                        End If
+                    End If
+                End If
+            Next
+
+            Dim TextWidth As Integer = ColumnWidth
+            For Each Item As ListViewItem In Group.Items
+                Dim Value = Item.SubItems.Item(1).Text
+                TextWidth = Math.Max(TextWidth, TextRenderer.MeasureText(Value, .Font).Width)
+            Next
+            Group.Tag = TextWidth - ColumnWidth
+        End With
+    End Sub
+
+    Private Sub PopulateGroupBootRecord(Disk As Disk, OEMNameResponse As OEMNameResponse)
+        Dim Value As String
+        Dim ForeColor As Color
+
+        Dim DiskFormatBySize = FloppyDiskFormatGet(Disk.Image.Length)
+        Dim BPBBySize = BuildBPB(DiskFormatBySize)
+        Dim DoBPBCompare = Disk.DiskParams.Format = FloppyDiskFormat.FloppyUnknown And DiskFormatBySize <> FloppyDiskFormat.FloppyUnknown
+
+        With ListViewSummary
+            Dim BootRecordGroup = .Groups.Add(GROUP_BOOTRECORD, My.Resources.Label_BootRecord)
+
+            If Not OEMNameResponse.Found Then
+                ForeColor = SystemColors.WindowText
+            ElseIf Not OEMNameResponse.Matched Then
+                ForeColor = Color.Red
+            ElseIf OEMNameResponse.Verified Then
+                ForeColor = Color.Green
+            Else
+                ForeColor = Color.Blue
+            End If
+
+            .AddItem(BootRecordGroup, BootSectorOffsets.OEMName.GetDescription(), Disk.BootSector.GetOEMNameString.TrimEnd(NULL_CHAR), ForeColor)
+
+            If DoBPBCompare AndAlso Disk.BootSector.BPB.BytesPerSector <> BPBBySize.BytesPerSector Then
+                ForeColor = Color.Blue
+            Else
+                ForeColor = SystemColors.WindowText
+            End If
+
+            .AddItem(BootRecordGroup, BPBOffsets.BytesPerSector.GetDescription(), Disk.BootSector.BPB.BytesPerSector, ForeColor)
+
+            If Not Disk.BootSector.BPB.HasValidSectorsPerCluster(True) Then
+                ForeColor = Color.Red
+            ElseIf DoBPBCompare AndAlso Disk.BootSector.BPB.SectorsPerCluster <> BPBBySize.SectorsPerCluster Then
+                ForeColor = Color.Blue
+            Else
+                ForeColor = SystemColors.WindowText
+            End If
+
+            .AddItem(BootRecordGroup, BPBOffsets.SectorsPerCluster.GetDescription(), Disk.BootSector.BPB.SectorsPerCluster, ForeColor)
+
+            If DoBPBCompare AndAlso Disk.BootSector.BPB.ReservedSectorCount <> BPBBySize.ReservedSectorCount Then
+                ForeColor = Color.Blue
+            Else
+                ForeColor = SystemColors.WindowText
+            End If
+
+            .AddItem(BootRecordGroup, BPBOffsets.ReservedSectorCount.GetDescription(), Disk.BootSector.BPB.ReservedSectorCount, ForeColor)
+
+            If DoBPBCompare AndAlso Disk.BootSector.BPB.NumberOfFATs <> BPBBySize.NumberOfFATs Then
+                ForeColor = Color.Blue
+            Else
+                ForeColor = SystemColors.WindowText
+            End If
+
+            If Disk.DiskParams.IsXDF Then
+                Value = "1 + " & My.Resources.SummaryPanel_CompatibilityImage
+            Else
+                Value = Disk.BootSector.BPB.NumberOfFATs
+                If Not Disk.FATTables.FATsMatch Then
+                    Value &= " " & InParens(My.Resources.Label_Mismatched)
+                    ForeColor = Color.Red
+                End If
+            End If
+
+            .AddItem(BootRecordGroup, BPBOffsets.NumberOfFATs.GetDescription(), Value, ForeColor)
+
+            If DoBPBCompare AndAlso Disk.BootSector.BPB.RootEntryCount <> BPBBySize.RootEntryCount Then
+                ForeColor = Color.Blue
+            Else
+                ForeColor = SystemColors.WindowText
+            End If
+
+            .AddItem(BootRecordGroup, BPBOffsets.RootEntryCount.GetDescription(), Disk.BootSector.BPB.RootEntryCount, ForeColor)
+
+            If DoBPBCompare AndAlso Disk.BootSector.BPB.SectorCount <> BPBBySize.SectorCount Then
+                ForeColor = Color.Blue
+            Else
+                ForeColor = SystemColors.WindowText
+            End If
+
+            .AddItem(BootRecordGroup, BPBOffsets.SectorCountSmall.GetDescription(), Disk.BootSector.BPB.SectorCount, ForeColor)
+
+            If DoBPBCompare AndAlso Disk.BootSector.BPB.MediaDescriptor <> BPBBySize.MediaDescriptor Then
+                ForeColor = Color.Blue
+            Else
+                ForeColor = SystemColors.WindowText
+            End If
+
+            Value = Disk.BootSector.BPB.MediaDescriptor.ToString("X2") & " Hex"
+
+            If Disk.BootSector.BPB.IsValid Then
+                If Not Disk.BPB.HasValidMediaDescriptor Then
+                    Value &= " " & InParens(My.Resources.Label_Invalid)
+                    ForeColor = Color.Red
+                ElseIf Disk.DiskParams.Format = FloppyDiskFormat.FloppyXDF35 AndAlso Disk.FAT.MediaDescriptor = &HF9 Then
+                    'Do Nothing - This is normal for XDF
+                ElseIf Disk.DiskParams.Format <> FloppyDiskFormat.FloppyUnknown AndAlso Disk.BootSector.BPB.MediaDescriptor <> Disk.DiskParams.BPBParams.MediaDescriptor Then
+                    Value &= " " & InParens(My.Resources.Label_Mismatched)
+                    ForeColor = Color.Red
+                ElseIf Disk.FAT.MediaDescriptor <> Disk.BootSector.BPB.MediaDescriptor Then
+                    Value &= " " & InParens(My.Resources.Label_Mismatched)
+                    ForeColor = Color.Red
+                End If
+            End If
+
+            .AddItem(BootRecordGroup, BPBOffsets.MediaDescriptor.GetDescription(), Value, ForeColor)
+
+            If DoBPBCompare AndAlso Disk.BootSector.BPB.SectorsPerFAT <> BPBBySize.SectorsPerFAT Then
+                ForeColor = Color.Blue
+            Else
+                ForeColor = SystemColors.WindowText
+            End If
+
+            .AddItem(BootRecordGroup, BPBOffsets.SectorsPerFAT.GetDescription(), Disk.BootSector.BPB.SectorsPerFAT, ForeColor)
+
+            If DoBPBCompare AndAlso Disk.BootSector.BPB.SectorsPerTrack <> BPBBySize.SectorsPerTrack Then
+                ForeColor = Color.Blue
+            Else
+                ForeColor = SystemColors.WindowText
+            End If
+
+            .AddItem(BootRecordGroup, BPBOffsets.SectorsPerTrack.GetDescription(), Disk.BootSector.BPB.SectorsPerTrack, ForeColor)
+
+            If DoBPBCompare AndAlso Disk.BootSector.BPB.NumberOfHeads <> BPBBySize.NumberOfHeads Then
+                ForeColor = Color.Blue
+            Else
+                ForeColor = SystemColors.WindowText
+            End If
+
+            .AddItem(BootRecordGroup, BPBOffsets.NumberOfHeads.GetDescription(), Disk.BootSector.BPB.NumberOfHeads, ForeColor)
+
+            If Disk.BootSector.BPB.HiddenSectors > 0 Then
+                .AddItem(BootRecordGroup, BPBOffsets.HiddenSectors.GetDescription(), Disk.BootSector.BPB.HiddenSectors)
+            End If
+
+            Dim BootStrapStart = Disk.BootSector.GetBootStrapOffset
+
+            If BootStrapStart >= BootSectorOffsets.BootStrapCode Then
+                If Disk.BootSector.DriveNumber > 0 Then
+                    .AddItem(BootRecordGroup, BootSectorOffsets.DriveNumber.GetDescription(), Disk.BootSector.DriveNumber)
+                End If
+
+                If Disk.BootSector.HasValidExtendedBootSignature Then
+                    .AddItem(BootRecordGroup, BootSectorOffsets.VolumeSerialNumber.GetDescription(), Disk.BootSector.VolumeSerialNumber.ToString("X8").Insert(4, "-"))
+                    If Disk.BootSector.ExtendedBootSignature = BootSector.ValidExtendedBootSignature(1) Then
+                        .AddItem(BootRecordGroup, BootSectorOffsets.VolumeLabel.GetDescription(), Disk.BootSector.GetVolumeLabelString.TrimEnd(NULL_CHAR))
+                        .AddItem(BootRecordGroup, BootSectorOffsets.FileSystemType.GetDescription(), Disk.BootSector.GetFileSystemTypeString)
+                    End If
+                End If
+            End If
+
+            If Not Disk.BootSector.HasValidBootStrapSignature Then
+                .AddItem(BootRecordGroup, BootSectorOffsets.BootStrapSignature.GetDescription(), Disk.BootSector.BootStrapSignature.ToString("X4"))
+            End If
+
+            If App.Globals.AppSettings.Debug Then
+                If Not Disk.BootSector.CheckJumpInstruction(True, True) Then
+                    ForeColor = Color.Red
+                Else
+                    ForeColor = SystemColors.WindowText
+                End If
+                .AddItem(BootRecordGroup, BootSectorOffsets.JmpBoot.GetDescription(), BitConverter.ToString(Disk.BootSector.JmpBoot), ForeColor)
+            End If
+        End With
+    End Sub
+
+    Private Sub PopulateGroupBootstrap(Disk As Disk, OEMNameResponse As OEMNameResponse)
+        Dim ForeColor As Color
+
+        With ListViewSummary
+            Dim BootStrapGroup = .Groups.Add(GROUP_BOOTSTRAP, My.Resources.Label_Bootstrap)
+
+            If Not OEMNameResponse.NoBootLoader Then
+                Dim BootStrapCRC32 = CRC32.ComputeChecksum(Disk.BootSector.BootStrapCode)
+                .AddItem(BootStrapGroup, My.Resources.Label_Bootstrap & " CRC32", BootStrapCRC32.ToString("X8"))
+            End If
+
+            If OEMNameResponse.Found Then
+                If OEMNameResponse.Data.Language.Length > 0 Then
+                    .AddItem(BootStrapGroup, My.Resources.Label_Language, OEMNameResponse.Data.Language)
+                End If
+
+                Dim OEMName = OEMNameResponse.MatchedOEMName
+
+                If OEMName Is Nothing And OEMNameResponse.Data.OEMNames.Count = 1 Then
+                    OEMName = OEMNameResponse.Data.OEMNames(0)
+                End If
+
+                If OEMName IsNot Nothing Then
+                    If OEMName.Company <> "" Then
+                        .AddItem(BootStrapGroup, My.Resources.SummaryPanel_Company, OEMName.Company)
+                    End If
+                    If OEMName.Description <> "" Then
+                        .AddItem(BootStrapGroup, My.Resources.SummaryPanel_Description, OEMName.Description)
+                    End If
+                    If OEMName.Note <> "" Then
+                        .AddItem(BootStrapGroup, My.Resources.SummaryPanel_Note, OEMName.Note, Color.Blue)
+                    End If
+                End If
+
+                If Disk.BootSector.BPB.IsValid Then
+                    If Not OEMNameResponse.Data.ExactMatch Then
+                        For Each OEMName In OEMNameResponse.Data.OEMNames
+                            If OEMName.Name.Length > 0 AndAlso OEMName.Suggestion AndAlso OEMName IsNot OEMNameResponse.MatchedOEMName Then
+                                If OEMName.Verified Then
+                                    ForeColor = Color.Green
+                                Else
+                                    ForeColor = SystemColors.WindowText
+                                End If
+                                .AddItem(BootStrapGroup, My.Resources.SummaryPanel_AltOEMName, OEMName.GetNameAsString, ForeColor)
+                            End If
+                        Next
+                    End If
+                End If
+            End If
+        End With
+    End Sub
+
+    Private Function PopulateGroupDisk(Disk As Disk) As ListViewGroup
+        Dim DiskGroup As ListViewGroup
+        Dim Value As String
+        Dim ForeColor As Color
+
+        With ListViewSummary
+            DiskGroup = .Groups.Add(GROUP_DISK, My.Resources.Label_Disk)
+
+            Dim Info = FloppyImageFormats.GetInfo(Disk.Image.ImageType)
+
+            .AddItem(DiskGroup, My.Resources.Label_ImageType, Info.Name)
+
+            If Disk.Image.ImageType = FloppyImageType.BasicSectorImage Then
+                If Disk.IsValidImage AndAlso Disk.CheckImageSize <> 0 Then
+                    ForeColor = Color.Red
+                Else
+                    ForeColor = SystemColors.WindowText
+                End If
+                .AddItem(DiskGroup, My.Resources.SummaryPanel_ImageSize, Disk.Image.Length.ToString("N0"), ForeColor)
+            End If
+
+            If Disk.IsValidImage(False) Then
+                Dim DiskFormatString = FloppyDiskFormatGetName(Disk.DiskParams.Format)
+                Dim DiskFormatBySize = FloppyDiskFormatGet(Disk.Image.Length)
+
+                If Disk.DiskParams.Format <> FloppyDiskFormat.FloppyUnknown Or DiskFormatBySize = FloppyDiskFormat.FloppyUnknown Then
+                    Value = String.Format(My.Resources.Label_Floppy, DiskFormatString)
+                Else
+                    Dim DiskFormatStringBySize = FloppyDiskFormatGetName(DiskFormatBySize)
+                    Value = String.Format(My.Resources.Label_Floppy, DiskFormatStringBySize) & " " & InParens(My.Resources.Label_CustomFormat)
+                End If
+                .AddItem(DiskGroup, My.Resources.Label_DiskFormat, Value)
+
+                If Disk.DiskParams.IsXDF Then
+                    Dim XDFChecksum = CalcXDFChecksum(Disk.Image.GetBytes, Disk.BPB.SectorsPerFAT)
+                    If XDFChecksum = Disk.GetXDFChecksum Then
+                        ForeColor = Color.Green
+                    Else
+                        ForeColor = Color.Red
+                    End If
+                    .AddItem(DiskGroup, My.Resources.SummaryPanel_XDFChecksum, XDFChecksum.ToString("X8"), ForeColor)
+                End If
+
+                If Disk.BPB.IsValid AndAlso Disk.CheckImageSize > 0 AndAlso Disk.DiskParams.Format <> FloppyDiskFormat.FloppyUnknown Then
+                    .AddItem(DiskGroup, DiskFormatString & " CRC32", HashFunctions.CRC32Hash(Disk.Image.GetBytes(0, Disk.BPB.ReportedImageSize())))
+                End If
+            End If
+
+            If Disk.Image.ImageType = FloppyImageType.TranscopyImage Then
+                Dim Image As ImageFormats.TC.TransCopyImage = DirectCast(Disk.Image, ImageFormats.TC.TranscopyFloppyImage).Image
+                Value = ImageFormats.TC.DiskTypeToString(Image.DiskType)
+                .AddItem(DiskGroup, My.Resources.SummaryPanel_DiskType, Value)
+            End If
+
+            If Disk.Image.ImageType <> FloppyImageType.BasicSectorImage Then
+                .AddItem(DiskGroup, My.Resources.Label_Tracks, Disk.Image.TrackCount)
+                .AddItem(DiskGroup, My.Resources.SummaryPanel_Heads, Disk.Image.SideCount)
+            End If
+
+            If Disk.Image.IsBitstreamImage Then
+                If Disk.Image.BitstreamImage.TrackStep <> 1 Then
+                    .AddItem(DiskGroup, My.Resources.SummaryPanel_TrackStep, Disk.Image.BitstreamImage.TrackStep)
+                End If
+                If Disk.Image.BitstreamImage.VariableBitRate Then
+                    .AddItem(DiskGroup, My.Resources.SummaryPanel_Bitrate, My.Resources.Label_Variable)
+                ElseIf Disk.Image.BitstreamImage.BitRate <> 0 Then
+                    ForeColor = GetBitRateColor(Disk.Image.BitstreamImage.BitRate, Disk.DiskParams.Format)
+                    .AddItem(DiskGroup, My.Resources.SummaryPanel_Bitrate, Disk.Image.BitstreamImage.BitRate, ForeColor)
+                End If
+
+                If Disk.Image.BitstreamImage.VariableRPM Then
+                    .AddItem(DiskGroup, My.Resources.SummaryPanel_RPM, My.Resources.Label_Variable)
+                ElseIf Disk.Image.BitstreamImage.RPM <> 0 Then
+                    ForeColor = GetRPMColor(Disk.Image.BitstreamImage.RPM, Disk.DiskParams.Format)
+                    .AddItem(DiskGroup, My.Resources.SummaryPanel_RPM, Disk.Image.BitstreamImage.RPM, ForeColor)
+                End If
+            End If
+
+            If Disk.Image.ImageType = FloppyImageType.D86FImage Then
+                Dim Image As ImageFormats.D86F.D86FImage = DirectCast(Disk.Image, ImageFormats.D86F.D86FFloppyImage).Image
+                If Image.RPMSlowDown <> 0 Then
+                    If Image.AlternateBitcellCalculation Then
+                        Value = My.Resources.SummaryPanel_SpeedUp & " " & (Image.RPMSlowDown * 100) & "%"
+                    Else
+                        Value = My.Resources.SummaryPanel_SlowDown & " " & (Image.RPMSlowDown * 100) & "%"
+                    End If
+                    .AddItem(DiskGroup, My.Resources.SummaryPanel_RPMAdjustment, Value)
+                End If
+                .AddItem(DiskGroup, My.Resources.SummaryPanel_WriteProtected, If(Image.WriteProtect, My.Resources.Label_Yes, My.Resources.Label_No))
+                .AddItem(DiskGroup, My.Resources.SummaryPanel_SurfaceData, If(Image.HasSurfaceData, My.Resources.Label_Yes, My.Resources.Label_No))
+
+            ElseIf Disk.Image.ImageType = FloppyImageType.HFEImage Then
+                Dim Image As ImageFormats.HFE.HFEImage = DirectCast(Disk.Image, ImageFormats.HFE.HFEFloppyImage).Image
+                .AddItem(DiskGroup, My.Resources.SummaryPanel_WriteProtected, If(Not Image.WriteAllowed, My.Resources.Label_Yes, My.Resources.Label_No))
+            End If
+
+            If Disk.Image.HasWeakBitsSupport Then
+                .AddItem(DiskGroup, My.Resources.SummaryPanel_WeakBits, If(Disk.Image.HasWeakBits, My.Resources.Label_Yes, My.Resources.Label_No))
+            End If
+
+            If Disk.Image.NonStandardTracks.Count > 0 Or Disk.Image.AdditionalTracks.Count > 0 Then
+                Dim TrackList As New HashSet(Of UShort)(Disk.Image.NonStandardTracks.Concat(Disk.Image.AdditionalTracks))
+                .AddItem(DiskGroup, My.Resources.SummaryPanel_NonStandardTracks, GetNonStandardTrackList(TrackList, Disk.Image.SideCount))
+            End If
+        End With
+
+        Return DiskGroup
+    End Function
+    Private Sub PopulateGroupFileSystem(Disk As Disk, Optional Preview As Boolean = False)
+        Dim Value As String
+        Dim ForeColor As Color
+
+        With ListViewSummary
+            Dim FileSystemGroup = .Groups.Add(GROUP_FILE_SYSTEM, My.Resources.Label_FileSystem)
+
+            If Disk.FAT.HasMediaDescriptor Then
+                Value = Disk.FAT.MediaDescriptor.ToString("X2") & " Hex"
+                ForeColor = SystemColors.WindowText
+                Dim Visible As Boolean = False
+                If Not Disk.BootSector.BPB.IsValid Then
+                    Visible = True
+                ElseIf Disk.FAT.MediaDescriptor <> Disk.BootSector.BPB.MediaDescriptor Then
+                    Visible = True
+                End If
+                If Not Disk.FAT.HasValidMediaDescriptor Then
+                    Value &= " " & InParens(My.Resources.Label_Invalid)
+                    ForeColor = Color.Red
+                    Visible = True
+                ElseIf Disk.DiskParams.Format = FloppyDiskFormat.FloppyXDF35 AndAlso Disk.FAT.MediaDescriptor = &HF9 Then
+                    Visible = False
+                ElseIf Disk.DiskParams.Format <> FloppyDiskFormat.FloppyUnknown AndAlso Disk.FAT.MediaDescriptor <> Disk.DiskParams.BPBParams.MediaDescriptor Then
+                    Value &= " " & InParens(My.Resources.Label_Mismatched)
+                    ForeColor = Color.Red
+                    Visible = True
+                End If
+
+                If Visible Then
+                    .AddItem(FileSystemGroup, My.Resources.Label_MediaDescriptor, Value, ForeColor)
+                End If
+            End If
+
+            Dim fsi = GetFileSystemInfo(Disk)
+
+            If fsi.VolumeLabel IsNot Nothing Then
+                .AddItem(FileSystemGroup, My.Resources.Label_VolumeLabel, fsi.VolumeLabel.GetVolumeName.TrimEnd(NULL_CHAR))
+                Dim VolumeDate = fsi.VolumeLabel.GetLastWriteDate
+                .AddItem(FileSystemGroup, My.Resources.SummaryPanel_VolumeDate, VolumeDate.ToString(True, True, False, True))
+            End If
+
+            .AddItem(FileSystemGroup, My.Resources.SummaryPanel_TotalSpace, FormatThousands(Disk.BPB.SectorToBytes(Disk.BPB.DataRegionSize)) & " " & My.Resources.Label_Bytes)
+            .AddItem(FileSystemGroup, My.Resources.SummaryPanel_FreeSpace, FormatThousands(Disk.FAT.GetFreeSpace()) & " " & My.Resources.Label_Bytes)
+
+            If Disk.FAT.BadClusters.Count > 0 Then
+                Dim SectorCount = Disk.FAT.BadClusters.Count * Disk.BPB.SectorsPerCluster
+                Value = FormatThousands(Disk.FAT.BadClusters.Count * Disk.BPB.BytesPerCluster) & " " & My.Resources.Label_Bytes & "  " & InParens(SectorCount)
+                .AddItem(FileSystemGroup, My.Resources.Label_BadSectors, Value, Color.Red)
+            End If
+
+            If Not Preview Then
+                Dim LostClusters = Disk.RootDirectory.FATAllocation.LostClusters.Count
+                If LostClusters > 0 Then
+                    Value = FormatThousands(LostClusters * Disk.BPB.BytesPerCluster) & " " & My.Resources.Label_Bytes & "  " & InParens(LostClusters)
+                    .AddItem(FileSystemGroup, My.Resources.Label_LostClusters, Value, Color.Red)
+                End If
+            End If
+
+            Dim ReservedClusters = Disk.FAT.ReservedClusters.Count
+            If ReservedClusters > 0 Then
+                Value = FormatThousands(ReservedClusters * Disk.BPB.BytesPerCluster) & " " & My.Resources.Label_Bytes & "  " & InParens(ReservedClusters)
+                .AddItem(FileSystemGroup, My.Resources.SummaryPanel_ReservedClusters, Value)
+            End If
+
+            If fsi.OldestFileDate IsNot Nothing Then
+                .AddItem(FileSystemGroup, My.Resources.SummaryPanel_OldestDate, fsi.OldestFileDate.Value.ToString(My.Resources.IsoDateTimeFormat))
+            End If
+
+            If fsi.NewestFileDate IsNot Nothing Then
+                .AddItem(FileSystemGroup, My.Resources.SummaryPanel_NewestDate, fsi.NewestFileDate.Value.ToString(My.Resources.IsoDateTimeFormat))
+            End If
+        End With
+    End Sub
+    Private Sub PopulateGroupTitle(Result As FloppyDB.TitleFindResult)
+        Dim TitleData = Result.Primary
+
+        If TitleRows Is Nothing Then
+            InitializeTitleRows()
+        End If
+
+        Dim Row = Function(key As String) DirectCast(TitleRows(key), SummaryRow)
+
+        Dim DiskCount = TitleData.DiskCount
+        Dim DiskName = TitleData.Disk
+
+        If Left(DiskName.ToLower(), 5) = "disk " Then
+            DiskName = Mid(DiskName, 6)
+        End If
+
+        If DiskName.Length > 0 AndAlso DiskCount > 0 Then
+            If IsNumeric(DiskName) Then
+                DiskName &= " of " & DiskCount
+            ElseIf DiskCount > 1 Then
+                DiskName &= "  (Set of " & DiskCount & ")"
+            End If
+        End If
+
+        Dim Status = TitleData.Status
+        Dim ForeColor As Color
+        If Status = FloppyDB.FloppyDBStatus.Verified Then
+            ForeColor = Color.Green
+        ElseIf Status = FloppyDB.FloppyDBStatus.Modified Then
+            ForeColor = Color.Red
+        ElseIf TitleData.Fixed Then
+            ForeColor = Color.Blue
+        Else
+            ForeColor = Color.Black
+        End If
+
+        With Row("Name")
+            .Value = Result.GetNameList
+            .ForeColor = ForeColor
+            .MobyGamesId = TitleData.MobyGamesId
+        End With
+        Row("Variation").Value = TitleData.Variation
+        Row("Compilation").Value = TitleData.Compilation
+        Row("Publisher").Value = Result.GetPublisherList
+        Row("Series").Value = Result.GetSeriesList
+        Row("Year").Value = Result.GetYearList
+        Row("Platform").Value = TitleData.Platform
+        Row("Region").Value = Result.GetRegionList
+        Row("Language").Value = Result.GetLanguageList
+        Row("Version").Value = Result.GetVersionDisplay
+        Row("Disk").Value = DiskName
+        Row("CopyProtection").Value = TitleData.CopyProtection
+
+        If App.AppSettings.Debug Then
+            With Row("TDC")
+                .Value = If(TitleData.IsTDC, My.Resources.Label_Yes, "")
+                .ForeColor = Color.Green
+            End With
+            With Row("TGOD")
+                .Value = TitleData.TGOD.Replace(",", ", ")
+                .TGOD = TitleData.TGOD
+            End With
+        End If
+
+        Dim Group = ListViewSummary.Groups.Add(GROUP_TITLE, My.Resources.SummaryPanel_Title)
+
+        PopulateGroup(Group, TitleRows)
+    End Sub
+
+    Private Sub PopulateMain(Disk As Disk, BootStrapDB As BootstrapDB, Optional TitleDB As FloppyDB.FloppyDB = Nothing, Optional MD5 As String = Nothing, Optional Preview As Boolean = False)
+        Dim TitleFound As Boolean = False
+
+        If Not Preview AndAlso TitleDB IsNot Nothing AndAlso App.Globals.AppSettings.DisplayTitles AndAlso TitleDB.TitleCount > 0 Then
+            Dim TitleFindResult = TitleDB.TitleFind(MD5)
+            If TitleFindResult.Matches IsNot Nothing Then
+                TitleFound = True
+                PopulateGroupTitle(TitleFindResult)
+            End If
+        End If
+
+        Dim DiskGroup = PopulateGroupDisk(Disk)
+
+        With ListViewSummary
+            If Not Disk.IsValidImage Then
+                .AddItem(DiskGroup, My.Resources.Label_FileSystem, My.Resources.Label_Unknown, Color.Red)
+            Else
+                Dim OEMNameResponse = BootStrapDB.CheckOEMName(Disk.BootSector)
+
+                If OEMNameResponse.NoBootLoader Then
+                    If Disk.BootSector.CheckJumpInstruction(False, True) Then
+                        .AddItem(DiskGroup, My.Resources.Label_Bootstrap, My.Resources.Label_NoBootLoader, Color.Red)
+                    Else
+                        .AddItem(DiskGroup, My.Resources.Label_Bootstrap, My.Resources.Label_CustomBootLoader, Color.Red)
+                    End If
+                ElseIf Not Disk.BootSector.BPB.IsValid Then
+                    .AddItem(DiskGroup, My.Resources.Label_BootRecord, My.Resources.Label_NoBPB, Color.Red)
+                End If
+
+                If Not Disk.BootSector.BPB.IsValid Then
+                    If Not Disk.FATTables.FATsMatch Then
+                        .AddItem(DiskGroup, My.Resources.Label_FATShort, My.Resources.Label_Mismatched, Color.Red)
+                    End If
+                End If
+
+                If Disk.BootSector.BPB.IsValid Then
+                    PopulateGroupBootRecord(Disk, OEMNameResponse)
+                End If
+
+                PopulateGroupFileSystem(Disk, Preview)
+                PopulateGroupBootstrap(Disk, OEMNameResponse)
+            End If
+        End With
+    End Sub
+
+#Region "Events"
+
+    Private Sub ContextMenuCopy_ItemClicked(sender As Object, e As ToolStripItemClickedEventArgs) Handles ContextMenuCopy.ItemClicked
+        Dim Metadata = GetFocusedItemMetadata()
+
+        If Metadata IsNot Nothing Then
+            If e.ClickedItem.Name = "CopyValue" Then
+                Clipboard.SetText(Metadata.Value)
+            ElseIf e.ClickedItem.Name = "MobyGames" Then
+                Dim URL = CombineUri(My.Settings.MobyGamesURL, "game", Uri.EscapeDataString(Metadata.MobyGamesId))
+                Process.Start(New ProcessStartInfo With {.FileName = URL.ToString, .UseShellExecute = True})
+            ElseIf e.ClickedItem.Name.Substring(0, 4) = "TGOD" Then
+                Dim URL = "https://www.goodolddays.net/en/diskimages/?id=" & e.ClickedItem.Tag.ToString()
+                Process.Start(New ProcessStartInfo With {.FileName = URL, .UseShellExecute = True})
+            End If
+        End If
+    End Sub
+
+    Private Sub ContextMenuCopy_Opening(sender As Object, e As CancelEventArgs) Handles ContextMenuCopy.Opening
+        Dim Metadata = GetFocusedItemMetadata()
+
+        If Metadata IsNot Nothing Then
+            Dim CM As ContextMenuStrip = sender
+            CM.Items("CopyValue").Text = String.Format(My.Resources.Menu_CopyValueByName, Metadata.Text)
+
+            If Metadata.MobyGamesId = "" Then
+                If CM.Items.IndexOfKey("MobyGames") >= 0 Then
+                    CM.Items.RemoveByKey("MobyGames")
+                End If
+            Else
+                If CM.Items.IndexOfKey("MobyGames") < 0 Then
+                    Dim Item = CM.Items.Add(My.Resources.Label_ViewMobyGames, My.Resources.MobyGames)
+                    Item.Name = "MobyGames"
+                End If
+            End If
+
+            If App.Globals.AppSettings.Debug Then
+                For i As Integer = 4 To 0 Step -1
+                    Dim key As String = "TGOD" & i.ToString()
+                    If CM.Items.IndexOfKey(key) >= 0 Then
+                        CM.Items.RemoveByKey(key)
+                    End If
+                Next
+
+                If Metadata.TGOD <> "" Then
+                    Dim i As Integer = 0
+                    Dim TGODList = Metadata.TGOD.Split(",")
+                    For Each TGOD In TGODList
+                        Dim key As String = "TGOD" & i.ToString()
+                        Dim Item = CM.Items.Add("View ID " & TGOD & " on goodolddays.net")
+                        Item.Name = key
+                        Item.Tag = TGOD
+                        i += 1
+                        If i > 4 Then
+                            Exit For
+                        End If
+                    Next
+                End If
+            End If
+        Else
+            e.Cancel = True
+        End If
+    End Sub
+
+    Private Sub ListView_DrawItem(sender As Object, e As DrawListViewItemEventArgs) Handles ListViewSummary.DrawItem
+        e.DrawDefault = True
+    End Sub
+
+    Private Sub ListView_DrawSubItem(sender As Object, e As DrawListViewSubItemEventArgs) Handles ListViewSummary.DrawSubItem
+        If e.Item.Group IsNot Nothing AndAlso e.Item.Group.Tag IsNot Nothing Then
+            Dim Offset As Integer = CInt(e.Item.Group.Tag)
+            If Offset <> 0 Then
+                e.DrawBackground()
+                Dim rect As Rectangle = Rectangle.Inflate(e.Bounds, -3, -2)
+                If e.ColumnIndex = 0 Then
+                    rect.Width -= Offset
+                Else
+                    rect.X -= Offset
+                    rect.Width += Offset
+                End If
+                TextRenderer.DrawText(e.Graphics, e.SubItem.Text, e.SubItem.Font, rect, e.SubItem.ForeColor, TextFormatFlags.Default Or TextFormatFlags.NoPrefix)
+            Else
+                e.DrawDefault = True
+            End If
+        Else
+            e.DrawDefault = True
+        End If
+    End Sub
+
+    Private Sub ListView_ItemSelectionChanged(sender As Object, e As ListViewItemSelectionChangedEventArgs) Handles ListViewSummary.ItemSelectionChanged
+        e.Item.Selected = False
+    End Sub
+
+    Private Sub ListView_KeyDown(sender As Object, e As KeyEventArgs) Handles ListViewSummary.KeyDown
+        If e.KeyCode <> Keys.Left AndAlso e.KeyCode <> Keys.Right Then
+            Exit Sub
+        End If
+
+        Dim Group = ListViewSummary.GetFocusedGroup()
+        If Group Is Nothing Then
+            Exit Sub
+        End If
+
+        SetGroupCollapsedState(Group, e.KeyCode = Keys.Left)
+        e.Handled = True
+    End Sub
+
+    Private Sub ListView_MouseUp(sender As Object, e As MouseEventArgs) Handles ListViewSummary.MouseUp
+        If e.Button <> MouseButtons.Left OrElse e.Clicks <> 1 Then
+            Exit Sub
+        End If
+
+        Dim Group = ListViewSummary.GetGroupExpanderAtPoint(e.Location)
+        If Group Is Nothing Then
+            Exit Sub
+        End If
+
+        SetGroupCollapsedState(Group, Not ListViewSummary.IsGroupCollapsed(Group))
+    End Sub
+
+    Private Sub SetGroupCollapsedState(Group As ListViewGroup, Collapsed As Boolean)
+        ListViewSummary.SetGroupCollapsed(Group, Collapsed)
+
+        If String.IsNullOrEmpty(Group.Name) Then
+            Exit Sub
+        End If
+
+        If Collapsed Then
+            CollapsedGroups.Add(Group.Name)
+        Else
+            CollapsedGroups.Remove(Group.Name)
+        End If
+    End Sub
+
+
+    'Private Sub ListView_Resize(sender As Object, e As EventArgs) Handles ListView.Resize
+    '    If ListView.Columns.Count < 2 Then
+    '        Exit Sub
+    '    End If
+
+    '    ListView.Columns.Item(1).Width = ListView.ClientSize.Width - ListView.Columns.Item(0).Width
+    'End Sub
+#End Region
+
+    Public Structure FileSystemInfo
+        Dim NewestFileDate As Date?
+        Dim OldestFileDate As Date?
+        Dim VolumeLabel As DirectoryEntry
+    End Structure
+
+    Private Class SummaryRow
+        Public Sub New(Font As Font, Text As String, WrapText As Boolean, AutoResize As Boolean)
+            _Text = Text
+            _TextWidth = TextRenderer.MeasureText(Text, Font).Width
+            _WrapText = WrapText
+            _AutoResize = AutoResize
+        End Sub
+
+        Public Property AutoResize As Boolean
+        Public Property ForeColor As Color = SystemColors.WindowText
+        Public Property Text As String
+        Public Property TextWidth As Integer
+        Public Property Value As String = ""
+        Public Property WrapText As Boolean
+        Public Property MobyGamesId As String = ""
+        Public Property TGOD As String = ""
+    End Class
+
+    Public Class SummaryMetadata
+        Public Property Text As String
+        Public Property Value As String
+        Public Property MobyGamesId As String = ""
+        Public Property TGOD As String = ""
+    End Class
+
+    Private Class ListViewGroupDblClickFilter
+        Inherits NativeWindow
+
+        Private Const WM_LBUTTONDBLCLK As Integer = &H203
+        Private ReadOnly ListViewControl As ListView
+
+        Public Sub New(ListViewControl As ListView)
+            Me.ListViewControl = ListViewControl
+
+            AddHandler ListViewControl.HandleCreated, AddressOf ListView_HandleCreated
+            AddHandler ListViewControl.HandleDestroyed, AddressOf ListView_HandleDestroyed
+
+            If ListViewControl.IsHandleCreated Then
+                AssignHandle(ListViewControl.Handle)
+            End If
+        End Sub
+
+        Protected Overrides Sub WndProc(ByRef m As Message)
+            If m.Msg = WM_LBUTTONDBLCLK Then
+                Dim LParam = m.LParam.ToInt32()
+                Dim Pt As New Point(CShort(LParam And &HFFFF), CShort((LParam >> 16) And &HFFFF))
+                If ListViewControl.GetGroupAtPoint(Pt) IsNot Nothing Then
+                    Exit Sub
+                End If
+            End If
+
+            MyBase.WndProc(m)
+        End Sub
+
+        Private Sub ListView_HandleCreated(sender As Object, e As EventArgs)
+            AssignHandle(ListViewControl.Handle)
+        End Sub
+
+        Private Sub ListView_HandleDestroyed(sender As Object, e As EventArgs)
+            ReleaseHandle()
+        End Sub
+    End Class
+End Class

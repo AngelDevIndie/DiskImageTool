@@ -1,10 +1,20 @@
 ﻿Public Class ComboFilter
+    Implements IDisposable
+
     Private ReadOnly _Combo As ToolStripComboBox
     Private ReadOnly _Filter As Dictionary(Of String, ComboFilterItem)
+    Private ReadOnly _onComboDisposed As EventHandler
+    Private _disposed As Boolean = False
+    Public Event SelectedIndexChanged As EventHandler
+
     Public Sub New(ComboBox As ToolStripComboBox)
         _Combo = ComboBox
         _Combo.ComboBox.DrawMode = DrawMode.OwnerDrawFixed
         AddHandler _Combo.ComboBox.DrawItem, AddressOf DrawItem
+        AddHandler _Combo.SelectedIndexChanged, AddressOf OnSelectedIndexChanged
+
+        _onComboDisposed = Sub(sender, e) Dispose()
+        AddHandler _Combo.Disposed, _onComboDisposed
 
         _Filter = New Dictionary(Of String, ComboFilterItem)
     End Sub
@@ -23,7 +33,7 @@
                 _Combo.Items.Item(Index) = Item
             End If
         Else
-            Dim Item = New ComboFilterItem With {
+            Dim Item As New ComboFilterItem With {
                 .Name = Name,
                 .Count = 1
             }
@@ -44,6 +54,27 @@
         If _Combo.Items.Count > 0 Then
             _Combo.SelectedIndex = 0
         End If
+    End Sub
+
+    Public Sub Dispose() Implements IDisposable.Dispose
+        If _disposed Then
+            Return
+        End If
+
+        _disposed = True
+
+        Try
+            If _Combo IsNot Nothing Then
+                RemoveHandler _Combo.Disposed, _onComboDisposed
+                If _Combo.ComboBox IsNot Nothing Then
+                    RemoveHandler _Combo.ComboBox.DrawItem, AddressOf DrawItem
+                    RemoveHandler _Combo.ComboBox.SelectedIndexChanged, AddressOf OnSelectedIndexChanged
+                End If
+            End If
+        Catch
+        End Try
+
+        GC.SuppressFinalize(Me)
     End Sub
 
     Public Sub Populate()
@@ -115,7 +146,7 @@
             Dim Name As String
             Dim Count As String
             If Item.AllItems Then
-                Name = "(ALL)"
+                Name = InParens(My.Resources.Filter_AllItems)
                 Count = ""
             Else
                 Name = Item.Name
@@ -139,6 +170,10 @@
 
         e.DrawFocusRectangle()
     End Sub
+
+    Private Sub OnSelectedIndexChanged(sender As Object, e As EventArgs)
+        RaiseEvent SelectedIndexChanged(sender, e)
+    End Sub
 End Class
 
 Public Class ComboFilterItem
@@ -148,7 +183,7 @@ Public Class ComboFilterItem
 
     Public Overrides Function ToString() As String
         If AllItems Then
-            Return "(ALL)"
+            Return InParens(My.Resources.Filter_AllItems)
         Else
             Return Name & "  [" & _Count & "]"
         End If

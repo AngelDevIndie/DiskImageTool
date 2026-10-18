@@ -13,6 +13,10 @@
             IDAMSync
             IDAM
             IDArea
+            IDAreaCylinder
+            IDAreaHead
+            IDAreaSectorId
+            IDAreaSizeId
             IDAMChecksumValid
             IDAMChecksumInvalid
             DAMNulls
@@ -38,38 +42,64 @@
             TrackFormatED = 4
         End Enum
 
-        Public Structure RegionData
-            Dim Regions As List(Of BitstreamRegion)
-            Dim Sectors As List(Of BitstreamRegionSector)
-            Dim Track As UShort
-            Dim Side As Byte
-            Dim NumBytes As UInteger
-            Dim NumBits As UInteger
-            Dim Aligned As Boolean
-            Dim Gap4A As UShort
-            Dim Gap1 As UShort
-        End Structure
-
         Module IBM_MFM_Tools
-            Public Const MFM_BYTE_SIZE As Byte = 16
-            Public Const MFM_ADDRESS_MARK_SIZE As Byte = 4
-            Public Const MFM_SYNC_SIZE As Byte = 12
-            Public Const MFM_SYNC_SIZE_BITS As Integer = 12 * MFM_BYTE_SIZE
-            Public Const MFM_GAP_BYTE As Byte = &H4E
-            Public Const MFM_GAP1_SIZE As Byte = 50
-            Public Const MFM_GAP2_SIZE As Byte = 22
-            Public Const MFM_GAP3_SIZE As Byte = 80
-            Public Const MFM_GAP4A_SIZE As Byte = 80
-            Public Const MFM_IDAM_SIZE As Byte = 6
-            Public Const MFM_IDAREA_SIZE As Byte = 4
-            Public Const MFM_CRC_SIZE As Byte = 2
-            Public ReadOnly MFM_IAM_Sync_Bytes() As Byte = {&H52, &H24, &H52, &H24, &H52, &H24}
-            Public ReadOnly MFM_IDAM_Sync_Bytes() As Byte = {&H44, &H89, &H44, &H89, &H44, &H89, &H55, &H54}
-            Public ReadOnly MFM_DAM_Sync_Bytes() As Byte = {&H44, &H89, &H44, &H89, &H44, &H89, &H55, &H45}
-            Public ReadOnly MFM_Sync_Bytes() As Byte = {&H44, &H89, &H44, &H89, &H44, &H89}
-            Public ReadOnly FM_IAM_Sync_Bytes() As Byte = {&HF5, &H7A}
-            Public ReadOnly FM_IDAM_Sync_Bytes() As Byte = {&HF5, &H7E}
-            Public ReadOnly FM_DAM_Sync_Bytes() As Byte = {&HF5, &H6F}
+            Private Const MAX_ALLOWED_BAD_GAPS_START As Integer = 1
+            Private Const MAX_ALLOWED_BAD_GAPS_END As Integer = 0
+            Private Const MFM_NULL_WORD As UShort = &H5555  'Binary 0101010101010101
+            Private Const MFM_GAP_WORD As UShort = &H2A49   'Binary 0010101001001001
+            Public Const FM_FIELD_BYTES As UInteger = 1
+            Public Const MFM_SYNC_NULL_BYTES As UInteger = 12
+            Public Const MFM_SYNC_BYTES As UInteger = 3
+            Public Const MFM_MARK_BYTES As UInteger = 1
+            Public Const MFM_SYNC_MARK_BYTES As UInteger = MFM_SYNC_BYTES + MFM_MARK_BYTES
+            Public Const MFM_PREAMBLE_BYTES As UInteger = MFM_SYNC_NULL_BYTES + MFM_SYNC_BYTES + MFM_MARK_BYTES
+
+            Public Const MFM_GAP_BYTE As UInteger = &H4E
+            Public Const MFM_IDAREA_BYTES As UInteger = 4
+            Public Const MFM_CRC_BYTES As UInteger = 2
+
+            Public Const MFM_BYTE_BITS As UInteger = 16
+            Public Const MFM_SYNC_NULL_BITS As UInteger = MFM_SYNC_NULL_BYTES * MFM_BYTE_BITS
+            Public Const MFM_SYNC_BITS As UInteger = MFM_SYNC_BYTES * MFM_BYTE_BITS
+            Public Const MFM_SYNC_MARK_BITS As UInteger = MFM_SYNC_MARK_BYTES * MFM_BYTE_BITS
+            Public Const MFM_IDAREA_BITS As UInteger = MFM_IDAREA_BYTES * MFM_BYTE_BITS
+            Public Const MFM_CRC_BITS As UInteger = MFM_CRC_BYTES * MFM_BYTE_BITS
+
+            Public ReadOnly MFM_IAM_SYNC_PATTERN_BYTES() As Byte = {&H52, &H24, &H52, &H24, &H52, &H24}
+            Public ReadOnly MFM_IDAM_SYNC_PATTERN_BYTES() As Byte = {&H44, &H89, &H44, &H89, &H44, &H89, &H55, &H54}
+            Public ReadOnly MFM_DAM_SYNC_PATTERN_BYTES() As Byte = {&H44, &H89, &H44, &H89, &H44, &H89, &H55, &H45}
+            Public ReadOnly MFM_SYNC_PATTERN_BYTES() As Byte = {&H44, &H89, &H44, &H89, &H44, &H89}
+
+            Public ReadOnly FM_IAM_SYNC_PATTERN_BYTES() As Byte = {&HF5, &H7A}
+            Public ReadOnly FM_IDAM_SYNC_PATTERN_BYTES() As Byte = {&HF5, &H7E}
+            Public ReadOnly FM_DAM_SYNC_PATTERN_BYTES() As Byte = {&HF5, &H6F}
+
+            Private Class MFMRegionInfo
+                ReadOnly Property ByteIndex As UInteger
+                ReadOnly Property BitstreamIndex As UInteger
+                ReadOnly Property BitOffset As UInteger
+
+                Public Sub New(Index As UInteger)
+                    _ByteIndex = MFMBitsToBytes(Index)
+                    _BitOffset = MFMBitOffset(Index)
+                    _BitstreamIndex = Index
+                End Sub
+
+                Public Sub AddBytes(Value As UInteger)
+                    _ByteIndex += Value
+                    _BitstreamIndex += MFMBytesToBits(Value)
+                End Sub
+
+                Public Sub AddBits(Value As UInteger)
+                    _BitstreamIndex += Value
+                    _ByteIndex += MFMBitsToBytes(Value)
+                End Sub
+
+                Public Sub SetByteIndex(Value As UInteger)
+                    _ByteIndex = Value
+                    _BitstreamIndex = MFMBytesToBits(Value)
+                End Sub
+            End Class
 
             Public Function AdjustBitIndex(Index As Integer, Length As UInteger) As Integer
                 If Index < 0 Then
@@ -97,7 +127,7 @@
             End Function
 
             Public Function BytesToBits(bytes() As Byte, Offset As UInteger, BitLength As UInteger, Optional Reverse As Boolean = True) As BitArray
-                Dim bufferSize = Math.Ceiling(BitLength / 8)
+                Dim bufferSize = CeilDiv(BitLength, 8)
                 Dim buffer(bufferSize - 1) As Byte
 
                 For i As Integer = 0 To bufferSize - 1
@@ -108,7 +138,7 @@
                     End If
                 Next
 
-                Dim bitArray = New BitArray(buffer) With {
+                Dim bitArray As New BitArray(buffer) With {
                     .Length = BitLength
                 }
 
@@ -116,7 +146,7 @@
             End Function
 
             Public Function BitsToBytes(Bitstream As BitArray, Padding As UInteger, Optional Reverse As Boolean = True) As Byte()
-                Dim Length = Math.Ceiling((Bitstream.Length + Padding) / 8)
+                Dim Length = CeilDiv(CUInt(Bitstream.Length) + Padding, 8)
 
                 Dim buffer(Length - 1) As Byte
 
@@ -157,20 +187,20 @@
             End Function
 
             Public Function FMGetOffset(Bitstream As BitArray) As UInteger
-                Dim FMPattern = BytesToBits(FM_IDAM_Sync_Bytes)
+                Dim FMPattern = BytesToBits(FM_IDAM_SYNC_PATTERN_BYTES)
                 Dim Pos = FindPattern(Bitstream, FMPattern, 0)
                 If Pos > -1 Then
-                    Return Pos Mod MFM_BYTE_SIZE
+                    Return Pos Mod MFM_BYTE_BITS
                 End If
 
                 Return 0
             End Function
 
             Public Function MFMGetOffset(Bitstream As BitArray) As UInteger
-                Dim MFMPattern = BytesToBits(MFM_Sync_Bytes)
+                Dim MFMPattern = BytesToBits(MFM_SYNC_PATTERN_BYTES)
                 Dim Pos = FindPattern(Bitstream, MFMPattern, 0)
                 If Pos > -1 Then
-                    Return Pos Mod MFM_BYTE_SIZE
+                    Return Pos Mod MFM_BYTE_BITS
                 End If
 
                 Return 0
@@ -184,304 +214,400 @@
                 Return b
             End Function
 
-            Public Function MFMGetRegionList(Bitstream As BitArray, TrackType As BitstreamTrackType) As RegionData
-                Dim IAMPattern As BitArray
-                Dim IDAMPattern As BitArray
+            Public Function MFMBitOffset(Value As UInteger) As UInteger
+                Return Value Mod MFM_BYTE_BITS
+            End Function
+
+            Public Function MFMBitsToBytes(Value As UInteger, Optional RoundUp As Boolean = False) As UInteger
+                If RoundUp Then
+                    Return (Value + MFM_BYTE_BITS - 1) \ MFM_BYTE_BITS
+                Else
+                    Return Value \ MFM_BYTE_BITS
+                End If
+            End Function
+
+            Public Function MFMBytesToBits(Value As UInteger) As UInteger
+                Return Value * MFM_BYTE_BITS
+            End Function
+
+            Private Function MFMProcessDAMRegion(Bitstream As BitArray, TrackType As BitstreamTrackType, RegionData As BitstreamRegionData, RegionSector As BitstreamRegionSector, PrevRegion As MFMRegionInfo, EndIndex As UInteger) As MFMRegionInfo
                 Dim DAMPattern As BitArray
-                Dim MaxSyncNulls As UInteger
+
+                If TrackType = BitstreamTrackType.MFM Then
+                    DAMPattern = BytesToBits(MFM_SYNC_PATTERN_BYTES)
+                Else
+                    DAMPattern = BytesToBits(FM_DAM_SYNC_PATTERN_BYTES)
+                End If
+
+                Dim Index = FindPattern(Bitstream, DAMPattern, PrevRegion.BitstreamIndex)
+
+                If Index < 0 Or Index >= EndIndex Then
+                    RegionSector.HasData = False
+                    Return PrevRegion
+                End If
+
+                Dim Buffer As Byte()
+
+                Dim RegionInfo As New MFMRegionInfo(Index)
+
+                If RegionInfo.BitOffset > 0 Then
+                    RegionData.Aligned = False
+                End If
+
+                If Index >= PrevRegion.BitstreamIndex + MFM_BYTE_BITS Then
+                    RegionSector.DAMNulls = GetSyncNullCount(Bitstream, PrevRegion.BitstreamIndex, Index)
+
+                    Dim OffsetEnd As UInteger = Index - MFMBytesToBits(RegionSector.DAMNulls)
+
+                    'Write splice occurs after ID field but before data field
+                    'This is the write splice we look for to determine if the sector data has been written by a PC as opposed to a track level duplicator
+                    'If TrackType = BitstreamTrackType.MFM Then
+                    RegionSector.BadGapsStart = AnalyzeWriteSpliceStart(Bitstream, PrevRegion.BitstreamIndex, OffsetEnd)
+                    RegionSector.WriteSplice = (RegionSector.BadGapsStart > MAX_ALLOWED_BAD_GAPS_START)
+                    'End If
+
+                    Buffer = GetGapBytes(Bitstream, PrevRegion.BitstreamIndex, OffsetEnd)
+
+                    If Buffer.Length > 0 Then
+                        RegionData.Regions.Add(New BitstreamRegion(MFMRegionType.Gap2, PrevRegion.ByteIndex, Buffer.Length, RegionSector, PrevRegion.BitOffset))
+                    End If
+
+                    If RegionSector.DAMNulls > 0 Then
+                        RegionData.Regions.Add(New BitstreamRegion(MFMRegionType.DAMNulls, RegionInfo.ByteIndex - RegionSector.DAMNulls, RegionSector.DAMNulls, RegionSector, RegionInfo.BitOffset))
+                    End If
+                End If
+
+                Buffer = MFMGetBytes(Bitstream, RegionInfo.BitstreamIndex, RegionSector.AdjustedDataLength + MFM_SYNC_MARK_BYTES)
+                Dim CalculatedChecksum = MFMCRC16(Buffer)
+
+                Dim RegionSize As UInteger
+
+                If TrackType = BitstreamTrackType.MFM Then
+                    RegionSize = DAMPattern.Length
+                    RegionData.Regions.Add(New BitstreamRegion(MFMRegionType.DAMSync, RegionInfo.ByteIndex, MFMBitsToBytes(RegionSize), RegionSector, RegionInfo.BitOffset))
+                    RegionInfo.AddBits(RegionSize)
+                End If
+
+                RegionSector.DAM = MFMGetByte(Bitstream, RegionInfo.BitstreamIndex)
+                RegionSize = MFM_BYTE_BITS
+                RegionData.Regions.Add(New BitstreamRegion(MFMRegionType.DAM, RegionInfo.ByteIndex, MFMBitsToBytes(RegionSize), RegionSector, RegionInfo.BitOffset))
+                RegionInfo.AddBits(RegionSize)
+
+                Dim SectorSize = RegionSector.AdjustedDataLength
+                Dim SectorLength = MFMBitsToBytes(EndIndex - RegionInfo.BitstreamIndex)
+
+                If SectorSize > SectorLength Then
+                    SectorSize = SectorLength
+                    RegionSector.Overlaps = True
+                Else
+                    RegionSector.Overlaps = False
+                End If
+
+                If RegionSector.Overlaps Then
+                    Buffer = MFMGetBytes(Bitstream, RegionInfo.BitstreamIndex, SectorSize)
+                    Dim SyncNullCount = GetByteCount(Buffer, 0, 0)
+                    SectorSize -= SyncNullCount
+
+                    Dim GapCount = GetByteCount(Buffer, MFM_GAP_BYTE, SyncNullCount, 6)
+                    SectorSize -= GapCount
+                End If
+
+                RegionSector.DataStartIndex = RegionInfo.ByteIndex
+                RegionData.Regions.Add(New BitstreamRegion(MFMRegionType.DataArea, RegionInfo.ByteIndex, SectorSize, RegionSector, RegionInfo.BitOffset))
+                If RegionInfo.ByteIndex + RegionSector.AdjustedDataLength > RegionData.NumBytes Then
+                    RegionData.NumBytes = RegionInfo.ByteIndex + RegionSector.AdjustedDataLength
+                End If
+
+                Buffer = MFMGetBytes(Bitstream, RegionInfo.BitstreamIndex + MFMBytesToBits(RegionSector.AdjustedDataLength), MFM_CRC_BYTES)
+                Dim Checksum = BitConverter.ToUInt16(Buffer, 0)
+                RegionSector.DataChecksumValid = (Checksum = CalculatedChecksum)
+
+                RegionInfo.AddBytes(SectorSize)
+
+                If Not RegionSector.Overlaps AndAlso SectorLength >= MFM_CRC_BYTES AndAlso SectorSize < SectorLength - MFM_CRC_BYTES Then
+                    Dim RegionType As MFMRegionType
+
+                    If RegionSector.DataChecksumValid Then
+                        RegionType = MFMRegionType.DataChecksumValid
+                    Else
+                        RegionType = MFMRegionType.DataChecksumInvalid
+                    End If
+
+                    RegionSize = MFM_CRC_BYTES
+                    RegionData.Regions.Add(New BitstreamRegion(RegionType, RegionInfo.ByteIndex, RegionSize, RegionSector, RegionInfo.BitOffset))
+                    RegionInfo.AddBytes(RegionSize)
+                End If
+
+                RegionSector.HasData = True
+
+                Return RegionInfo
+            End Function
+
+            Private Function MFMProcessIAMRegion(Bitstream As BitArray, TrackType As BitstreamTrackType, RegionData As BitstreamRegionData, PrevRegion As MFMRegionInfo, EndIndex As UInteger) As MFMRegionInfo
+                Dim IAMPattern As BitArray
+
+                If TrackType = BitstreamTrackType.MFM Then
+                    IAMPattern = BytesToBits(MFM_IAM_SYNC_PATTERN_BYTES)
+                Else
+                    IAMPattern = BytesToBits(FM_IAM_SYNC_PATTERN_BYTES)
+                End If
+
+                Dim Index = FindPattern(Bitstream, IAMPattern, PrevRegion.BitstreamIndex)
+
+                If Index < 0 Or Index >= EndIndex Then
+                    Return PrevRegion
+                End If
+
+                Dim RegionInfo As New MFMRegionInfo(Index)
+
+                If RegionInfo.BitOffset > 0 Then
+                    RegionData.Aligned = False
+                End If
+
+                If Index >= PrevRegion.BitstreamIndex + MFM_BYTE_BITS Then
+                    RegionData.IAMNulls = GetSyncNullCount(Bitstream, PrevRegion.BitstreamIndex, Index)
+
+                    Dim Buffer = GetGapBytes(Bitstream, PrevRegion.BitstreamIndex, Index - MFMBytesToBits(RegionData.IAMNulls))
+                    RegionData.Gap4A = Buffer.Length
+
+                    If Buffer.Length > 0 Then
+                        RegionData.Regions.Add(New BitstreamRegion(MFMRegionType.Gap4A, PrevRegion.ByteIndex, Buffer.Length, RegionInfo.BitOffset))
+                    End If
+
+                    If RegionData.IAMNulls > 0 Then
+                        RegionData.Regions.Add(New BitstreamRegion(MFMRegionType.IAMNulls, RegionInfo.ByteIndex - RegionData.IAMNulls, RegionData.IAMNulls, RegionInfo.BitOffset))
+                    End If
+                End If
+
+                Dim RegionSize As UInteger
+
+                If TrackType = BitstreamTrackType.MFM Then
+                    RegionSize = IAMPattern.Length
+                    RegionData.Regions.Add(New BitstreamRegion(MFMRegionType.IAMSync, RegionInfo.ByteIndex, MFMBitsToBytes(RegionSize), RegionInfo.BitOffset))
+                    RegionInfo.AddBits(RegionSize)
+                End If
+
+                RegionSize = MFM_BYTE_BITS
+                RegionData.Regions.Add(New BitstreamRegion(MFMRegionType.IAM, RegionInfo.ByteIndex, MFMBitsToBytes(RegionSize), RegionInfo.BitOffset))
+                RegionInfo.AddBits(RegionSize)
+
+                Return RegionInfo
+            End Function
+
+            Private Function MFMProcessRegionSector(Bitstream As BitArray, TrackType As BitstreamTrackType, RegionData As BitstreamRegionData, PrevRegion As MFMRegionInfo, RegionSector As BitstreamRegionSector, PrevRegionSector As BitstreamRegionSector) As MFMRegionInfo
+                Dim IDAMPattern As BitArray
                 Dim IDAMByteLength As Byte
 
                 If TrackType = BitstreamTrackType.MFM Then
-                    IAMPattern = BytesToBits(MFM_IAM_Sync_Bytes)
-                    IDAMPattern = BytesToBits(MFM_Sync_Bytes)
-                    DAMPattern = BytesToBits(MFM_Sync_Bytes)
-                    MaxSyncNulls = 12
-                    IDAMByteLength = 8
+                    IDAMPattern = BytesToBits(MFM_SYNC_PATTERN_BYTES)
+                    IDAMByteLength = MFM_SYNC_MARK_BYTES + MFM_IDAREA_BYTES
                 Else
-                    IAMPattern = BytesToBits(FM_IAM_Sync_Bytes)
-                    IDAMPattern = BytesToBits(FM_IDAM_Sync_Bytes)
-                    DAMPattern = BytesToBits(FM_DAM_Sync_Bytes)
-                    MaxSyncNulls = 6
-                    IDAMByteLength = 5
+                    IDAMPattern = BytesToBits(FM_IDAM_SYNC_PATTERN_BYTES)
+                    IDAMByteLength = FM_FIELD_BYTES + MFM_IDAREA_BYTES
                 End If
 
-                Dim BitstreamIndex As UInteger = 0
-                Dim ByteIndex As UInteger = 0
-                Dim PrevByteIndex As UInteger
-                Dim Buffer() As Byte
-                Dim CalculatedChecksum As UShort
-                Dim Checksum As UShort
+                Dim Buffer As Byte()
                 Dim RegionType As MFMRegionType
-                Dim SyncNullCount As UInteger
-                Dim GapCount As UInteger
-                Dim Index As Integer
-                Dim DataIndex As Integer
-                Dim DataLength As UInteger
-                Dim BitOffset As UInteger = 0
-                Dim PrevBitOffset As UInteger
-                Dim RegionSector As BitstreamRegionSector = Nothing
-                Dim PrevRegionSector As BitstreamRegionSector
 
-                Dim RegionData As RegionData
-                RegionData.Regions = New List(Of BitstreamRegion)
-                RegionData.Sectors = New List(Of BitstreamRegionSector)
-                RegionData.NumBytes = Math.Ceiling(Bitstream.Length / MFM_BYTE_SIZE)
-                RegionData.NumBits = Bitstream.Length
-                RegionData.Aligned = True
-                RegionData.Gap4A = 0
-                RegionData.Gap1 = 0
+                Dim RegionInfo As New MFMRegionInfo(RegionSector.StartIndexBits)
+
+                If RegionInfo.BitOffset > 0 Then
+                    RegionData.Aligned = False
+                End If
+
+                If RegionSector.StartIndexBits >= PrevRegion.BitstreamIndex + MFM_BYTE_BITS Then
+                    RegionSector.IDAMNulls = GetSyncNullCount(Bitstream, PrevRegion.BitstreamIndex, RegionSector.StartIndexBits)
+
+                    Dim OffsetEnd As UInteger = RegionSector.StartIndexBits - MFMBytesToBits(RegionSector.IDAMNulls)
+
+                    Buffer = GetGapBytes(Bitstream, PrevRegion.BitstreamIndex, OffsetEnd)
+
+                    If Buffer.Length > 0 Then
+                        If RegionSector.SectorIndex = 0 Then
+                            RegionType = MFMRegionType.Gap1
+                            RegionData.Gap1 = Buffer.Length
+                        Else
+                            RegionType = MFMRegionType.Gap3
+                            If PrevRegionSector IsNot Nothing Then
+                                PrevRegionSector.Gap3 = Buffer.Length
+                                'Additional check for write splice between data area and Gap3 if needed
+                                If Not PrevRegionSector.WriteSplice AndAlso PrevRegionSector.HasData AndAlso (PrevRegionSector.DAMNulls <> 12 Or PrevRegionSector.BadGapsStart > 0) Then
+                                    Dim BadGaps = AnalyzeWriteSpliceEnd(Bitstream, PrevRegion.BitstreamIndex, OffsetEnd)
+                                    PrevRegionSector.WriteSplice = BadGaps > MAX_ALLOWED_BAD_GAPS_END
+                                End If
+                            End If
+                        End If
+                        RegionData.Regions.Add(New BitstreamRegion(RegionType, PrevRegion.ByteIndex, Buffer.Length, PrevRegionSector, RegionInfo.BitOffset))
+                    End If
+
+                    If RegionSector.IDAMNulls > 0 Then
+                        RegionData.Regions.Add(New BitstreamRegion(MFMRegionType.IDAMNulls, RegionInfo.ByteIndex - RegionSector.IDAMNulls, RegionSector.IDAMNulls, RegionSector, RegionInfo.BitOffset))
+                    End If
+
+                    RegionSector.StartIndex -= RegionSector.IDAMNulls
+
+                    If PrevRegionSector IsNot Nothing Then
+                        PrevRegionSector.Length -= RegionSector.IDAMNulls
+                    End If
+                End If
+
+                Buffer = MFMGetBytes(Bitstream, RegionInfo.BitstreamIndex, IDAMByteLength)
+                Dim CalculatedChecksum = MFMCRC16(Buffer)
+
+                Dim RegionSize As UInteger
+
+                If TrackType = BitstreamTrackType.MFM Then
+                    RegionSize = IDAMPattern.Length
+                    RegionData.Regions.Add(New BitstreamRegion(MFMRegionType.IDAMSync, RegionInfo.ByteIndex, MFMBitsToBytes(RegionSize), RegionSector, RegionInfo.BitOffset))
+                    RegionInfo.AddBits(RegionSize)
+                End If
+
+                RegionSize = MFM_BYTE_BITS
+                RegionData.Regions.Add(New BitstreamRegion(MFMRegionType.IDAM, RegionInfo.ByteIndex, MFMBitsToBytes(RegionSize), RegionSector, RegionInfo.BitOffset))
+                RegionInfo.AddBits(RegionSize)
+
+                Buffer = MFMGetBytes(Bitstream, RegionInfo.BitstreamIndex, MFM_IDAREA_BYTES)
+                RegionSector.Track = Buffer(0)
+                RegionSector.Side = Buffer(1)
+                RegionSector.SectorId = Buffer(2)
+                RegionSector.DataLength = GetSectorSizeBytes(Buffer(3))
+                RegionSector.AdjustedDataLength = RegionSector.DataLength
+
+                RegionSize = MFM_BYTE_BITS
+                RegionData.Regions.Add(New BitstreamRegion(MFMRegionType.IDAreaCylinder, RegionInfo.ByteIndex, MFMBitsToBytes(RegionSize), RegionSector, RegionInfo.BitOffset))
+                RegionInfo.AddBits(RegionSize)
+
+                RegionSize = MFM_BYTE_BITS
+                RegionData.Regions.Add(New BitstreamRegion(MFMRegionType.IDAreaHead, RegionInfo.ByteIndex, MFMBitsToBytes(RegionSize), RegionSector, RegionInfo.BitOffset))
+                RegionInfo.AddBits(RegionSize)
+
+                RegionSize = MFM_BYTE_BITS
+                RegionData.Regions.Add(New BitstreamRegion(MFMRegionType.IDAreaSectorId, RegionInfo.ByteIndex, MFMBitsToBytes(RegionSize), RegionSector, RegionInfo.BitOffset))
+                RegionInfo.AddBits(RegionSize)
+
+                RegionSize = MFM_BYTE_BITS
+                RegionData.Regions.Add(New BitstreamRegion(MFMRegionType.IDAreaSizeId, RegionInfo.ByteIndex, MFMBitsToBytes(RegionSize), RegionSector, RegionInfo.BitOffset))
+                RegionInfo.AddBits(RegionSize)
+
+                'RegionSize = MFM_IDAREA_BYTES
+                'RegionData.Regions.Add(New BitstreamRegion(MFMRegionType.IDArea, RegionInfo.ByteIndex, RegionSize, RegionSector, RegionInfo.BitOffset))
+                'RegionInfo.AddBytes(RegionSize)
+
+                Buffer = MFMGetBytes(Bitstream, RegionInfo.BitstreamIndex, MFM_CRC_BYTES)
+                Dim Checksum = BitConverter.ToUInt16(Buffer, 0)
+                RegionSector.IDAMChecksumValid = (Checksum = CalculatedChecksum)
+
+                If RegionSector.IDAMChecksumValid Then
+                    RegionType = MFMRegionType.IDAMChecksumValid
+                Else
+                    RegionType = MFMRegionType.IDAMChecksumInvalid
+                End If
+
+                RegionSize = MFM_CRC_BYTES
+                RegionData.Regions.Add(New BitstreamRegion(RegionType, RegionInfo.ByteIndex, RegionSize, RegionSector, RegionInfo.BitOffset))
+                RegionInfo.AddBytes(RegionSize)
+
+                Return RegionInfo
+            End Function
+
+            Public Function MFMGetRegionList(Bitstream As BitArray, TrackType As BitstreamTrackType) As BitstreamRegionData
+                Dim RegionData As New BitstreamRegionData With {
+                    .NumBytes = MFMBitsToBytes(Bitstream.Length, True),
+                    .NumBits = Bitstream.Length
+                }
+
+                If TrackType = BitstreamTrackType.MFM Then
+                    RegionData.Encoding = "MFM"
+                ElseIf TrackType = BitstreamTrackType.FM Then
+                    RegionData.Encoding = "FM"
+                Else
+                    RegionData.Encoding = ""
+                End If
 
                 Dim Pattern As BitArray
                 If TrackType = BitstreamTrackType.MFM Then
-                    Pattern = BytesToBits(MFM_IDAM_Sync_Bytes)
+                    Pattern = BytesToBits(MFM_IDAM_SYNC_PATTERN_BYTES)
                 Else
-                    Pattern = BytesToBits(FM_IDAM_Sync_Bytes)
+                    Pattern = BytesToBits(FM_IDAM_SYNC_PATTERN_BYTES)
                 End If
 
                 Dim SectorList = MFMGetSectorList(Bitstream, Pattern)
 
-                Dim EndIndex = Bitstream.Length
+                Dim EndIndex As UInteger = Bitstream.Length
                 If SectorList.Count > 0 Then
                     EndIndex = SectorList.Item(0)
                 End If
 
-                Index = FindPattern(Bitstream, IAMPattern, BitstreamIndex)
-                If Index > -1 And Index < EndIndex Then
-                    PrevByteIndex = ByteIndex
-                    ByteIndex = Index \ MFM_BYTE_SIZE
-                    BitstreamIndex = Index Mod MFM_BYTE_SIZE
-                    BitOffset = BitstreamIndex
-                    If BitOffset > 0 Then
-                        RegionData.Aligned = False
-                    End If
+                Dim RegionInfo As New MFMRegionInfo(0)
 
-                    If Index >= BitstreamIndex + MFM_BYTE_SIZE Then
-                        SyncNullCount = GetSyncNullCount(Bitstream, BitstreamIndex, Index, MaxSyncNulls)
+                RegionInfo = MFMProcessIAMRegion(Bitstream, TrackType, RegionData, RegionInfo, EndIndex)
 
-                        Buffer = GetGapBytes(Bitstream, BitstreamIndex, Index - SyncNullCount * MFM_BYTE_SIZE)
-                        RegionData.Gap4A = Buffer.Length
+                Dim RegionSector As BitstreamRegionSector = Nothing
+                Dim SectorIndex As UShort = 0
 
-                        If Buffer.Length > 0 Then
-                            RegionData.Regions.Add(New BitstreamRegion(MFMRegionType.Gap4A, PrevByteIndex, Buffer.Length, Nothing, BitOffset))
-                        End If
-
-                        If SyncNullCount > 0 Then
-                            RegionData.Regions.Add(New BitstreamRegion(MFMRegionType.IAMNulls, ByteIndex - SyncNullCount, SyncNullCount, Nothing, BitOffset))
-                        End If
-                    End If
-                    BitstreamIndex = Index
-
-                    If TrackType = BitstreamTrackType.MFM Then
-                        RegionData.Regions.Add(New BitstreamRegion(MFMRegionType.IAMSync, ByteIndex, IAMPattern.Length \ MFM_BYTE_SIZE, Nothing, BitOffset))
-                        ByteIndex += IAMPattern.Length \ MFM_BYTE_SIZE
-                        BitstreamIndex += IDAMPattern.Length
-                    End If
-
-                    RegionData.Regions.Add(New BitstreamRegion(MFMRegionType.IAM, ByteIndex, 1, Nothing, BitOffset))
-                    ByteIndex += 1
-                    BitstreamIndex += MFM_BYTE_SIZE
-                End If
-
-                Dim SectorIndex = 0
                 For Each Index In SectorList
-                    PrevByteIndex = ByteIndex
-                    PrevBitOffset = BitOffset
-                    ByteIndex = Index \ MFM_BYTE_SIZE
-                    BitOffset = Index Mod MFM_BYTE_SIZE
-                    If BitOffset > 0 Then
-                        RegionData.Aligned = False
-                    End If
-
-                    PrevRegionSector = RegionSector
+                    Dim PrevRegionSector = RegionSector
                     If PrevRegionSector IsNot Nothing Then
-                        PrevRegionSector.Length = Index \ MFM_BYTE_SIZE - PrevRegionSector.StartIndex
+                        PrevRegionSector.Length = MFMBitsToBytes(Index) - PrevRegionSector.StartIndex
                     End If
 
                     RegionSector = New BitstreamRegionSector With {
-                        .StartIndex = Index \ MFM_BYTE_SIZE,
+                        .StartIndexBits = Index,
+                        .StartIndex = MFMBitsToBytes(Index),
                         .SectorIndex = SectorIndex,
-                        .Gap3 = 0
+                        .Gap3 = 0,
+                        .HasWeakBits = False,
+                        .WriteSplice = False
                     }
                     RegionData.Sectors.Add(RegionSector)
 
-                    If BitstreamIndex = 0 Then
-                        BitstreamIndex = BitOffset
-                    End If
-
-                    If Index >= BitstreamIndex + MFM_BYTE_SIZE Then
-                        SyncNullCount = GetSyncNullCount(Bitstream, BitstreamIndex, Index, MaxSyncNulls)
-
-                        Buffer = GetGapBytes(Bitstream, BitstreamIndex, Index - SyncNullCount * MFM_BYTE_SIZE)
-
-                        If Buffer.Length > 0 Then
-                            If SectorIndex = 0 Then
-                                RegionType = MFMRegionType.Gap1
-                                RegionData.Gap1 = Buffer.Length
-                            Else
-                                RegionType = MFMRegionType.Gap3
-                                RegionData.Sectors.Item(SectorIndex - 1).Gap3 = Buffer.Length
-                            End If
-                            RegionData.Regions.Add(New BitstreamRegion(RegionType, PrevByteIndex, Buffer.Length, PrevRegionSector, BitOffset))
-                        End If
-
-                        If SyncNullCount > 0 Then
-                            RegionData.Regions.Add(New BitstreamRegion(MFMRegionType.IDAMNulls, ByteIndex - SyncNullCount, SyncNullCount, RegionSector, BitOffset))
-                        End If
-
-                        RegionSector.StartIndex -= SyncNullCount
-
-                        If PrevRegionSector IsNot Nothing Then
-                            PrevRegionSector.Length -= SyncNullCount
-                        End If
-                    End If
-                    BitstreamIndex = Index
-
-                    Buffer = MFMGetBytes(Bitstream, BitstreamIndex, IDAMByteLength)
-                    CalculatedChecksum = MFMCRC16(Buffer)
-
-                    If TrackType = BitstreamTrackType.MFM Then
-                        RegionData.Regions.Add(New BitstreamRegion(MFMRegionType.IDAMSync, ByteIndex, IDAMPattern.Length \ MFM_BYTE_SIZE, RegionSector, BitOffset))
-                        ByteIndex += IDAMPattern.Length \ MFM_BYTE_SIZE
-                        BitstreamIndex += IDAMPattern.Length
-                    End If
-
-                    RegionData.Regions.Add(New BitstreamRegion(MFMRegionType.IDAM, ByteIndex, 1, RegionSector, BitOffset))
-                    ByteIndex += 1
-                    BitstreamIndex += MFM_BYTE_SIZE
-
-                    Buffer = MFMGetBytes(Bitstream, BitstreamIndex, 4)
-                    RegionSector.Track = Buffer(0)
-                    RegionSector.Side = Buffer(1)
-                    RegionSector.SectorId = Buffer(2)
-                    DataLength = GetSectorSizeBytes(Buffer(3))
-                    RegionSector.DataLength = DataLength
-                    RegionData.Regions.Add(New BitstreamRegion(MFMRegionType.IDArea, ByteIndex, MFM_IDAREA_SIZE, RegionSector, BitOffset))
-                    ByteIndex += MFM_IDAREA_SIZE
-                    BitstreamIndex += MFM_IDAREA_SIZE * MFM_BYTE_SIZE
-
-                    Buffer = MFMGetBytes(Bitstream, BitstreamIndex, 2)
-                    Checksum = BitConverter.ToUInt16(Buffer, 0)
-                    If Checksum = CalculatedChecksum Then
-                        RegionType = MFMRegionType.IDAMChecksumValid
-                    Else
-                        RegionType = MFMRegionType.IDAMChecksumInvalid
-                    End If
-
-                    RegionData.Regions.Add(New BitstreamRegion(RegionType, ByteIndex, MFM_CRC_SIZE, RegionSector, BitOffset))
-                    ByteIndex += MFM_CRC_SIZE
-                    BitstreamIndex += MFM_CRC_SIZE * MFM_BYTE_SIZE
+                    RegionInfo = MFMProcessRegionSector(Bitstream, TrackType, RegionData, RegionInfo, RegionSector, PrevRegionSector)
 
                     Dim SectorEnd As UInteger
-                    If SectorIndex < SectorList.Count - 1 Then
-                        SectorEnd = SectorList.Item(SectorIndex + 1)
+
+                    If RegionSector.SectorIndex < SectorList.Count - 1 Then
+                        SectorEnd = SectorList.Item(RegionSector.SectorIndex + 1)
                         'Detect invalid data length - Formaster Copylock
-                        If DataLength = 256 Then
-                            If BitstreamIndex + 526 * MFM_BYTE_SIZE < SectorEnd Then
-                                DataLength = 512
+                        If RegionSector.DataLength = 256 Then
+                            'Not sure why I chose 526 - Need to research
+                            If RegionInfo.BitstreamIndex + MFMBytesToBits(526) < SectorEnd Then
+                                RegionSector.AdjustedDataLength = 512
                             End If
                         End If
                     Else
                         SectorEnd = Bitstream.Length
                     End If
 
-                    DataIndex = FindPattern(Bitstream, DAMPattern, BitstreamIndex)
-                    If DataIndex > -1 And DataIndex < SectorEnd Then
-                        PrevByteIndex = ByteIndex
-                        PrevBitOffset = BitOffset
-                        ByteIndex = DataIndex \ MFM_BYTE_SIZE
-                        BitOffset = DataIndex Mod MFM_BYTE_SIZE
-                        If BitOffset > 0 Then
-                            RegionData.Aligned = False
-                        End If
+                    RegionInfo = MFMProcessDAMRegion(Bitstream, TrackType, RegionData, RegionSector, RegionInfo, SectorEnd)
 
-                        If DataIndex >= BitstreamIndex + MFM_BYTE_SIZE Then
-                            SyncNullCount = GetSyncNullCount(Bitstream, BitstreamIndex, DataIndex, MaxSyncNulls)
-
-                            Buffer = GetGapBytes(Bitstream, BitstreamIndex, DataIndex - SyncNullCount * MFM_BYTE_SIZE)
-
-                            If Buffer.Length > 0 Then
-                                RegionData.Regions.Add(New BitstreamRegion(MFMRegionType.Gap2, PrevByteIndex, Buffer.Length, RegionSector, PrevBitOffset))
-                            End If
-
-                            If SyncNullCount > 0 Then
-                                RegionData.Regions.Add(New BitstreamRegion(MFMRegionType.DAMNulls, ByteIndex - SyncNullCount, SyncNullCount, RegionSector, BitOffset))
-                            End If
-                        End If
-
-                        BitstreamIndex = DataIndex
-
-                        Buffer = MFMGetBytes(Bitstream, BitstreamIndex, DataLength + 4)
-                        CalculatedChecksum = MFMCRC16(Buffer)
-
-                        If TrackType = BitstreamTrackType.MFM Then
-                            RegionData.Regions.Add(New BitstreamRegion(MFMRegionType.DAMSync, ByteIndex, DAMPattern.Length \ MFM_BYTE_SIZE, RegionSector, BitOffset))
-                            ByteIndex += DAMPattern.Length \ MFM_BYTE_SIZE
-                            BitstreamIndex += DAMPattern.Length
-                        End If
-
-                        RegionData.Regions.Add(New BitstreamRegion(MFMRegionType.DAM, ByteIndex, 1, RegionSector, BitOffset))
-                        ByteIndex += 1
-                        BitstreamIndex += MFM_BYTE_SIZE
-
-                        Dim SectorSize = DataLength
-                        Dim SectorLength = (SectorEnd - BitstreamIndex) \ MFM_BYTE_SIZE
-                        Dim Overlaps As Boolean = False
-
-                        If SectorSize > SectorLength Then
-                            SectorSize = SectorLength
-                            Overlaps = True
-                        End If
-
-                        SyncNullCount = 0
-                        GapCount = 0
-                        If Overlaps Then
-                            Buffer = MFMGetBytes(Bitstream, BitstreamIndex, SectorSize)
-                            SyncNullCount = GetByteCount(Buffer, 0, 0)
-                            SectorSize -= SyncNullCount
-                            GapCount = GetByteCount(Buffer, MFM_GAP_BYTE, SyncNullCount, 6)
-                            SectorSize -= GapCount
-                        End If
-
-                        RegionSector.DataStartIndex = ByteIndex
-                        RegionData.Regions.Add(New BitstreamRegion(MFMRegionType.DataArea, ByteIndex, SectorSize, RegionSector, BitOffset))
-                        If ByteIndex + DataLength > RegionData.NumBytes Then
-                            RegionData.NumBytes = ByteIndex + DataLength
-                        End If
-
-                        Buffer = MFMGetBytes(Bitstream, BitstreamIndex + DataLength * MFM_BYTE_SIZE, 2)
-                        Checksum = BitConverter.ToUInt16(Buffer, 0)
-                        RegionSector.DataChecksumValid = (Checksum = CalculatedChecksum)
-
-                        If RegionSector.DataChecksumValid Then
-                            RegionType = MFMRegionType.DataChecksumValid
-                        Else
-                            RegionType = MFMRegionType.DataChecksumInvalid
-                        End If
-
-                        ByteIndex += SectorSize
-                        BitstreamIndex += SectorSize * MFM_BYTE_SIZE
-
-                        If Not Overlaps And SectorSize < SectorLength - 2 Then
-                            RegionData.Regions.Add(New BitstreamRegion(RegionType, ByteIndex, MFM_CRC_SIZE, RegionSector, BitOffset))
-                            ByteIndex += MFM_CRC_SIZE
-                            BitstreamIndex += MFM_CRC_SIZE * MFM_BYTE_SIZE
-                        End If
-                    End If
                     SectorIndex += 1
                 Next
 
-                If BitstreamIndex > 0 And BitstreamIndex < Bitstream.Length Then
-                    GapCount = Math.Ceiling((Bitstream.Length - BitstreamIndex) / MFM_BYTE_SIZE)
-                    RegionData.Regions.Add(New BitstreamRegion(MFMRegionType.Gap4B, ByteIndex, GapCount, RegionSector, BitOffset))
+                If RegionInfo.BitstreamIndex > 0 And RegionInfo.BitstreamIndex < Bitstream.Length Then
+                    Dim OffsetEnd = Bitstream.Length - RegionInfo.BitstreamIndex
+
+                    If TrackType = BitstreamTrackType.MFM Then
+                        'Additional check for write splice between data area and Gap3 if needed
+                        If Not RegionSector.WriteSplice AndAlso RegionSector.HasData AndAlso (RegionSector.DAMNulls <> 12 Or RegionSector.BadGapsStart > 0) Then
+                            Dim Allowed As New HashSet(Of UShort) From {
+                                MFM_GAP_WORD
+                            }
+                            Dim BadGaps = AnalyzeWriteSpliceEnd(Bitstream, RegionInfo.BitstreamIndex, OffsetEnd, Allowed)
+                            RegionSector.WriteSplice = BadGaps > MAX_ALLOWED_BAD_GAPS_END
+                        End If
+                    End If
+
+                    RegionData.Regions.Add(New BitstreamRegion(MFMRegionType.Gap4B, RegionInfo.ByteIndex, MFMBitsToBytes(OffsetEnd, True), RegionSector, RegionInfo.BitOffset))
+
                     If RegionSector IsNot Nothing Then
-                        RegionSector.Length = Math.Ceiling(Bitstream.Length / MFM_BYTE_SIZE) - RegionSector.StartIndex
+                        RegionSector.Length = MFMBitsToBytes(Bitstream.Length, True) - RegionSector.StartIndex
                     End If
                 End If
 
-                ByteIndex = Math.Ceiling(Bitstream.Length / MFM_BYTE_SIZE)
-                If RegionData.NumBytes > ByteIndex Then
-                    Dim Length = RegionData.NumBytes - ByteIndex
-                    RegionData.Regions.Add(New BitstreamRegion(MFMRegionType.Overflow, ByteIndex, Length, Nothing, BitOffset))
+                RegionInfo.SetByteIndex(MFMBitsToBytes(Bitstream.Length, True))
+                If RegionData.NumBytes > RegionInfo.ByteIndex Then
+                    Dim Length = RegionData.NumBytes - RegionInfo.ByteIndex
+                    RegionData.Regions.Add(New BitstreamRegion(MFMRegionType.Overflow, RegionInfo.ByteIndex, Length, RegionInfo.BitOffset))
                 End If
 
                 Return RegionData
@@ -517,26 +643,129 @@
             End Function
 
             Private Function GetGapBytes(BitStream As BitArray, OffsetStart As UInteger, OffsetEnd As UInteger) As Byte()
-                Dim Diff = Math.Truncate((OffsetEnd - OffsetStart) / MFM_BYTE_SIZE) * MFM_BYTE_SIZE
+                Dim Diff = ((OffsetEnd - OffsetStart) \ MFM_BYTE_BITS) * MFM_BYTE_BITS
 
                 OffsetEnd = OffsetStart + Diff
 
                 Return MFMGetBytesByRange(BitStream, OffsetStart, OffsetEnd)
             End Function
 
-            Private Function GetSyncNullCount(BitStream As BitArray, OffsetStart As UInteger, OffsetEnd As UInteger, MaxCount As UInteger) As UInteger
-                Dim Diff = Math.Truncate((OffsetEnd - OffsetStart) / MFM_BYTE_SIZE) * MFM_BYTE_SIZE
-                OffsetStart = OffsetEnd - Diff
+            Private Function GetGapValues(BitStream As BitArray, OffsetStart As UInteger, OffsetEnd As UInteger, Optional Backward As Boolean = False) As HashSet(Of UShort)
+                Const TopN As Integer = 3
+                Const MinFrequency As Integer = 2
 
-                Dim Buffer = MFMGetBytesByRange(BitStream, OffsetStart, OffsetEnd)
-
-                Dim Count = GetByteCount(Buffer, 0, 0)
-
-                If Count > MaxCount Then
-                    Count = MaxCount
+                If OffsetEnd < OffsetStart + MFM_BYTE_BITS Then
+                    Return New HashSet(Of UShort)
                 End If
 
+                Dim GapValues As New Dictionary(Of UShort, Integer)
+
+                If Backward Then
+                    Dim Offset As UInteger = OffsetEnd
+                    Do While Offset >= OffsetStart + MFM_BYTE_BITS
+                        Offset -= MFM_BYTE_BITS
+                        Dim Value As UShort = GetWordFromBitArray(BitStream, Offset)
+                        If GapValues.ContainsKey(Value) Then
+                            GapValues(Value) += 1
+                        Else
+                            GapValues(Value) = 1
+                        End If
+                    Loop
+                Else
+                    For Offset As UInteger = OffsetStart To OffsetEnd - MFM_BYTE_BITS Step MFM_BYTE_BITS
+                        Dim Value = GetWordFromBitArray(BitStream, Offset)
+                        If GapValues.ContainsKey(Value) Then
+                            GapValues(Value) += 1
+                        Else
+                            GapValues(Value) = 1
+                        End If
+                    Next
+                End If
+
+
+                Dim Frequent = GapValues.
+                    Where(Function(kv) kv.Value >= MinFrequency).
+                    OrderByDescending(Function(kv) kv.Value).
+                    Take(TopN)
+
+                Return Frequent.Select(Function(kv) kv.Key).ToHashSet
+            End Function
+
+            Private Function GetSyncNullCount(BitStream As BitArray, OffsetStart As UInteger, OffsetEnd As UInteger) As UInteger
+                Dim Count As UInteger = 0
+
+                If OffsetEnd < OffsetStart + MFM_BYTE_BITS Then
+                    Return Count
+                End If
+
+                Do
+                    OffsetEnd -= MFM_BYTE_BITS
+                    Dim Value = GetWordFromBitArray(BitStream, OffsetEnd)
+                    If Value <> MFM_NULL_WORD Then
+                        Exit Do
+                    End If
+                    Count += 1
+                Loop While OffsetEnd >= OffsetStart + MFM_BYTE_BITS
+
                 Return Count
+            End Function
+
+            Private Function AnalyzeWriteSpliceStart(BitStream As BitArray, OffsetStart As UInteger, OffsetEnd As UInteger) As UInteger
+                Const MaxWordsToCheck As Integer = 2
+                Dim WordCount As UInteger = 0
+                Dim BadGapCount As UInteger = 0
+
+                If OffsetEnd < OffsetStart + MFM_BYTE_BITS Then
+                    Return BadGapCount
+                End If
+
+                'Get possible gap values
+                Dim Allowed = GetGapValues(BitStream, OffsetStart, OffsetEnd)
+
+                'If there is more than one bad gap word then we have a write splice
+                Dim Offset As Integer = OffsetEnd - MFM_BYTE_BITS
+
+                Do While Offset >= OffsetStart AndAlso WordCount < MaxWordsToCheck
+                    Dim Value = GetWordFromBitArray(BitStream, Offset)
+                    If Not Allowed.Contains(Value) Then
+                        BadGapCount += 1
+                    End If
+                    WordCount += 1
+                    Offset -= MFM_BYTE_BITS
+                Loop
+
+                Return BadGapCount
+            End Function
+
+            Private Function AnalyzeWriteSpliceEnd(BitStream As BitArray, OffsetStart As UInteger, OffsetEnd As UInteger, Optional Allowed As HashSet(Of UShort) = Nothing) As UInteger
+                Const MaxWordsToCheck As Integer = 2
+                Dim WordCount As UInteger = 0
+                Dim BadGapCount As UInteger = 0
+
+                OffsetStart += MFM_BYTE_BITS
+
+                If OffsetEnd < OffsetStart + MFM_BYTE_BITS Then
+                    Return BadGapCount
+                End If
+
+                'Get possible gap values
+                If Allowed Is Nothing Then
+                    Allowed = GetGapValues(BitStream, OffsetStart, OffsetEnd, True)
+                End If
+
+                'If there is more than one bad gap word then we have a write splice
+                Dim Offset As Integer = OffsetStart
+
+                Do While Offset < OffsetEnd AndAlso WordCount < MaxWordsToCheck
+                    Dim Value = GetWordFromBitArray(BitStream, Offset)
+                    If Not Allowed.Contains(Value) Then
+                        BadGapCount += 1
+                    End If
+                    WordCount += 1
+                    Offset += MFM_BYTE_BITS
+                Loop
+
+                Return BadGapCount
             End Function
 
             Public Function FindPattern(BitStream As BitArray, Pattern As BitArray, Optional Start As Integer = 0) As Integer
@@ -588,23 +817,41 @@
                 Return (2 ^ Size) * 128
             End Function
 
-            Public Function GetTrackFormat(Size As UInteger) As MFMTrackFormat
-                Size = Math.Round(Size / 10000) * 10000
-                If Size = 100000 Then
+            Public Function GetTrackFormat(BitCount As UInteger) As MFMTrackFormat
+                BitCount = Math.Round(BitCount / 5000) * 5000
+
+                If BitCount <= 135000 Then
                     Return MFMTrackFormat.TrackFormatDD
-                ElseIf Size = 170000 Then
+                ElseIf BitCount >= 165000 And BitCount <= 175000 Then
                     Return MFMTrackFormat.TrackFormatHD1200
-                ElseIf Size = 200000 Then
+                ElseIf BitCount >= 195000 And BitCount <= 205000 Then
                     Return MFMTrackFormat.TrackFormatHD
-                ElseIf Size = 400000 Then
+                ElseIf BitCount >= 395000 And BitCount <= 405000 Then
                     Return MFMTrackFormat.TrackFormatED
                 Else
                     Return MFMTrackFormat.TrackFormatUnknown
                 End If
             End Function
 
-            Public Function IsStandardSector(Sector As IBM_MFM_Sector, Track As Byte, Side As Byte) As Boolean
-                If Not Sector.InitialDataChecksumValid Or Not Sector.IDChecksumValid Then
+            Private Function GetWordFromBitArray(BitStream As BitArray, Offset As Integer) As UShort
+                Dim Value As Integer = 0
+                Dim BitCount As Integer = Math.Min(MFM_BYTE_BITS, BitStream.Length - Offset)
+
+                For i As Integer = 0 To BitCount - 1
+                    If BitStream(Offset + i) Then
+                        Value = Value Or (1 << i)
+                    End If
+                Next
+
+                Return CUShort(Value)
+            End Function
+
+            Public Function IsMappableSector(Sector As IBM_MFM_Sector, Track As Byte, Side As Byte, MaxSectors As Byte) As Boolean
+                If Sector.SectorId < 1 Or Sector.SectorId > MaxSectors Then
+                    Return False
+                End If
+
+                If Not Sector.DAMFound Or Sector.Data Is Nothing Then
                     Return False
                 End If
 
@@ -612,19 +859,20 @@
                     Return False
                 End If
 
-                If Sector.GetSizeBytes <> 512 Then
-                    Return False
-                End If
-
                 If Sector.Track <> Track Or Sector.Side <> Side Then
                     Return False
                 End If
 
-                If Not Sector.DAMFound Or Sector.DAM <> MFMAddressMark.Data Then
+                ' A bad ID or data checksum still has stored sector data.
+                If Sector.DAM <> MFMAddressMark.Data Then
                     Return False
                 End If
 
                 Return True
+            End Function
+
+            Public Function IsStandardSector(Sector As IBM_MFM_Sector, Track As Byte, Side As Byte, MaxSectors As Byte) As Boolean
+                Return IsMappableSector(Sector, Track, Side, MaxSectors) AndAlso Sector.InitialDataChecksumValid AndAlso Sector.IDChecksumValid
             End Function
 
             Public Function MFMCRC16(data As Byte()) As UShort
@@ -648,22 +896,18 @@
             Public Function MFMEncodeBytes(Data() As Byte, SeedBit As Boolean) As BitArray
                 Dim Bitstream As New BitArray(Data.Length * 16)
                 Dim bitCount As Integer = 0
-                Dim dateBit As Boolean
+                Dim dataBit As Boolean
                 Dim clockBit As Boolean
 
                 Dim prevDataBit = SeedBit
                 For i = 0 To Data.Length - 1
                     For j = 7 To 0 Step -1
-                        dateBit = CBool((Data(i) And (1 << j)))
-                        If Not dateBit And Not prevDataBit Then
-                            clockBit = True
-                        Else
-                            clockBit = False
-                        End If
+                        dataBit = CBool((Data(i) And (1 << j)))
+                        clockBit = (Not dataBit And Not prevDataBit)
                         Bitstream.Set(bitCount, clockBit)
-                        Bitstream.Set(bitCount + 1, dateBit)
+                        Bitstream.Set(bitCount + 1, dataBit)
 
-                        prevDataBit = dateBit
+                        prevDataBit = dataBit
                         bitCount += 2
                     Next
                 Next
@@ -736,13 +980,20 @@
                     NumBytes = OffsetEnd - OffsetStart
                 End If
 
-                NumBytes \= MFM_BYTE_SIZE
+                NumBytes \= MFM_BYTE_BITS
 
                 If NumBytes > 0 Then
                     Return MFMGetBytes(BitStream, OffsetStart, NumBytes)
                 End If
 
                 Return New Byte(-1) {}
+            End Function
+
+            Public Function MFMGetSize(RPM As UShort, DataRate As UShort) As UInteger
+                Dim MicrosecondsPerRev As Single = 1 / RPM * 60 * 1000000
+                Dim MicrossecondsPerBit As Single = DataRate / 1000
+
+                Return Math.Ceiling(MicrosecondsPerRev * MicrossecondsPerBit / 8) * 16
             End Function
 
             Public Function ResizeBitstream(Bitstream As BitArray, Length As UInteger) As BitArray

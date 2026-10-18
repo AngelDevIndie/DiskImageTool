@@ -1,0 +1,269 @@
+﻿Imports DiskImageTool.DiskImage.FloppyDiskFunctions
+Imports Greaseweazle.Actions
+Imports Greaseweazle.Tools
+
+Namespace Flux.Greaseweazle
+    Public Class CleanDiskForm
+        Inherits BaseFluxForm
+
+#Region "Form Controls"
+        Private WithEvents ButtonProcess As Button
+        Private WithEvents ComboImageDrives As ComboBox
+        Private _LabelCyls As Label
+        Private _LabelDrive As Label
+        Private _LabelLinger As Label
+        Private _LabelPasses As Label
+        Private _NumericCyls As NumericUpDown
+        Private _NumericLinger As NumericUpDown
+        Private _NumericPasses As NumericUpDown
+#End Region
+        Private WithEvents CleanCmd As CleanCommand
+        Private ReadOnly _Initialized As Boolean = False
+
+        Public Sub New()
+            MyBase.New(Settings.LogFileName, False)
+            InitializeControls()
+            InitializeHelp()
+
+            CleanCmd = Engine.Clean
+
+            Me.HelpButton = True
+            Me.Text = My.Resources.Label_CleanDisk
+
+            _NumericCyls.Value = DEFAULT_CYLS
+            _NumericLinger.Value = DEFAULT_LINGER
+            _NumericPasses.Value = DEFAULT_PASSES
+
+            PopulateDrives(ComboImageDrives, FloppyDriveType.DriveUnknown)
+            ClearLogAndStatus()
+            RefreshButtonState()
+            RefreshCylinderCount()
+
+            _Initialized = True
+        End Sub
+
+        Public Shared Sub Display()
+            Using dlg As New CleanDiskForm()
+                dlg.ShowDialog(App.CurrentFormInstance)
+            End Using
+        End Sub
+
+        Protected Overrides Sub OnFormClosed(e As FormClosedEventArgs)
+            CleanCmd = Nothing
+
+            MyBase.OnFormClosed(e)
+        End Sub
+
+        Private Sub CleanDisk()
+            Dim Opt As DriveOption = ComboImageDrives.SelectedValue
+
+            If String.IsNullOrEmpty(Opt?.Id) Then
+                Exit Sub
+            End If
+
+            ClearLogAndStatus()
+
+            Dim Drive As DriveSpec = Nothing
+            If Not TryMakeDriveSpec(Opt.Id, Drive) Then
+                Return
+            End If
+
+            Dim Cyls = CInt(_NumericCyls.Value)
+            Dim Passes = CInt(_NumericPasses.Value)
+
+            Dim Opts As New CleanOptions With {
+                .Cyls = Cyls,
+                .Sequences = Clean.BuildPassSequences(Cyls, Passes),
+                .LingerMs = CInt(_NumericLinger.Value),
+                .Live = True,
+                .Device = ConfiguredDevice(),
+                .Drive = Drive
+            }
+
+            Runner.RunAsync(Sub(Token) CleanCmd.Run(Opts, Token))
+        End Sub
+
+        Private Sub InitializeControls()
+            InitializeFooter()
+
+            With TableLayoutPanelMain
+                .SuspendLayout()
+                .RowCount = 2
+                .ColumnCount = 9
+                .Dock = DockStyle.Fill
+
+                FillAutoSizeStyles()
+
+                .ColumnStyles(2).SizeType = SizeType.Percent
+                .ColumnStyles(2).Width = 100
+
+                Dim Row As Integer = 0
+
+                InitializeControlsRowDrive(Row) : Row += 1
+                InitializeControlsRowButtons(Row) : Row += 1
+
+                .ResumeLayout()
+            End With
+        End Sub
+
+        Private Sub InitializeControlsRowButtons(Row As Integer)
+            Dim ButtonContainer As New FlowLayoutPanel With {
+                .FlowDirection = FlowDirection.RightToLeft,
+                .AutoSize = True,
+                .Anchor = AnchorStyles.Right,
+                .Margin = New Padding(3, 3, 0, 3)
+            }
+
+            ButtonProcess = New Button With {
+                .Width = 75,
+                .Margin = New Padding(3, 3, 3, 3),
+                .Text = My.Resources.Label_Erase
+            }
+
+            ButtonContainer.Controls.Add(ButtonProcess)
+
+            TableLayoutPanelMain.Controls.AddWithSpan(ButtonContainer, 5, Row, 4)
+        End Sub
+
+        Private Sub InitializeControlsRowDrive(Row As Integer)
+            _LabelDrive = New Label With {
+                .Text = My.Resources.Label_Drive,
+                .Anchor = AnchorStyles.Right,
+                .AutoSize = True
+            }
+
+            ComboImageDrives = New ComboBox With {
+                .Anchor = AnchorStyles.Left Or AnchorStyles.Right,
+                .Width = 180
+            }
+
+            _LabelCyls = New Label With {
+                .Text = My.Resources.Label_Cylinders,
+                .Anchor = AnchorStyles.Left,
+                .AutoSize = True,
+                .Margin = New Padding(6, 3, 3, 3)
+            }
+
+            _NumericCyls = New NumericUpDown With {
+                .Anchor = AnchorStyles.Left,
+                .Width = 45,
+                .Minimum = MIN_CYLS,
+                .Maximum = MAX_CYLS
+            }
+
+            _LabelPasses = New Label With {
+                .Text = My.Resources.Label_Passes,
+                .Anchor = AnchorStyles.Left,
+                .AutoSize = True,
+                .Margin = New Padding(6, 3, 3, 3)
+            }
+
+            _NumericPasses = New NumericUpDown With {
+                .Anchor = AnchorStyles.Left,
+                .Width = 45,
+                .Minimum = MIN_PASSES,
+                .Maximum = MAX_PASSES
+            }
+
+            _LabelLinger = New Label With {
+                .Text = My.Resources.Label_Linger,
+                .Anchor = AnchorStyles.Left,
+                .AutoSize = True,
+                .Margin = New Padding(6, 3, 3, 3)
+            }
+
+            _NumericLinger = New NumericUpDown With {
+                .Anchor = AnchorStyles.Left,
+                .Width = 60,
+                .Minimum = MIN_LINGER,
+                .Maximum = MAX_LINGER
+            }
+
+            With TableLayoutPanelMain
+                .Controls.Add(_LabelDrive, 0, Row)
+                .Controls.Add(ComboImageDrives, 1, Row)
+
+                .Controls.Add(_LabelCyls, 3, Row)
+                .Controls.Add(_NumericCyls, 4, Row)
+
+                .Controls.Add(_LabelPasses, 5, Row)
+                .Controls.Add(_NumericPasses, 6, Row)
+
+                .Controls.Add(_LabelLinger, 7, Row)
+                .Controls.Add(_NumericLinger, 8, Row)
+            End With
+        End Sub
+
+        Private Sub InitializeFooter()
+            ButtonOk.Visible = False
+            ButtonCancel.Text = WithoutHotkey(My.Resources.Menu_Close)
+        End Sub
+
+        Private Sub InitializeHelp()
+            SetHelpString(My.Resources.HelpStrings.Greaseweazle_Drives, _LabelDrive, ComboImageDrives)
+            SetHelpString(My.Resources.HelpStrings.Greaseweazle_CleanCyls, _LabelCyls, _NumericCyls)
+            SetHelpString(My.Resources.HelpStrings.Greaseweazle_CleanPasses, _LabelPasses, _NumericPasses)
+            SetHelpString(My.Resources.HelpStrings.Greaseweazle_CleanLinger, _LabelLinger, _NumericLinger)
+            SetHelpString(My.Resources.HelpStrings.Flux_Clean, ButtonProcess)
+            SetHelpString(My.Resources.HelpStrings.Flux_SaveLog, ButtonSaveLog)
+        End Sub
+
+        Private Sub RefreshButtonState()
+            Dim Opt As DriveOption = ComboImageDrives.SelectedValue
+
+            ComboImageDrives.Enabled = IsIdle
+            _NumericPasses.Enabled = IsIdle
+            _NumericLinger.Enabled = IsIdle
+            _NumericCyls.Enabled = IsIdle
+
+            ButtonProcess.Text = If(IsRunning, My.Resources.Label_Abort, My.Resources.Label_Clean)
+            ButtonProcess.Enabled = Not String.IsNullOrEmpty(Opt?.Id)
+
+            RefreshSaveLogButtonState()
+
+            ButtonReset.Enabled = IsIdle
+        End Sub
+
+        Private Sub RefreshCylinderCount()
+            Dim Opt As DriveOption = ComboImageDrives.SelectedValue
+
+            Dim MaxTrackCount As UShort = If(Opt IsNot Nothing AndAlso Opt.Type = FloppyDriveType.Drive525DoubleDensity, 40US, 80US)
+
+            If _NumericCyls.Maximum <> MaxTrackCount Then
+                _NumericCyls.Maximum = MaxTrackCount
+                _NumericCyls.Value = MaxTrackCount
+            End If
+        End Sub
+
+#Region "Events"
+        Private Sub ButtonProcess_Click(sender As Object, e As EventArgs) Handles ButtonProcess.Click
+            If CancelIfRunning() Then
+                Exit Sub
+            End If
+
+            CleanDisk()
+        End Sub
+
+        Private Sub CleanCmd_CylinderSeeked(sender As Object, e As CleanCylinderEventArgs) Handles CleanCmd.CylinderSeeked
+            Runner.EmitOutputText(FormatCleanCylinderSeekedFragment(e))
+        End Sub
+
+        Private Sub CleanCmd_PassStarted(sender As Object, e As CleanPassStartedEventArgs) Handles CleanCmd.PassStarted
+            Runner.EmitOutputText(FormatCleanPassStartedFragment(e))
+        End Sub
+
+        Private Sub ComboImageDrives_SelectedIndexChanged(sender As Object, e As EventArgs) Handles ComboImageDrives.SelectedIndexChanged
+            If Not _Initialized Then
+                Exit Sub
+            End If
+
+            RefreshButtonState()
+            RefreshCylinderCount()
+        End Sub
+
+        Private Sub Runner_ProcessStateChanged(state As ConsoleProcessRunner.ProcessStateEnum) Handles Runner.ProcessStateChanged
+            RefreshButtonState()
+        End Sub
+#End Region
+    End Class
+End Namespace

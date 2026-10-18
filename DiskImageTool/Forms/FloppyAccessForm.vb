@@ -2,6 +2,7 @@
 Imports System.ComponentModel
 
 Public Class FloppyAccessForm
+    Private Const BYTES_PER_SECTOR As UShort = 512
     Private ReadOnly _AccessType As FloppyAccessType
     Private ReadOnly _BPB As BiosParameterBlock
     Private ReadOnly _FloppyDrive As FloppyInterface
@@ -11,6 +12,7 @@ Public Class FloppyAccessForm
     Private _DoFormat As Boolean
     Private _DoVerify As Boolean
     Private _EndProcess As Boolean = False
+    Private _FileName As String = ""
     Private _LastStatus As TrackStatus
     Private _SectorData As SectorData = Nothing
     Private _SectorError As Boolean = False
@@ -35,21 +37,17 @@ Public Class FloppyAccessForm
         InitializeComponent()
 
         ' Add any initialization after the InitializeComponent() call
-        TableSide0.GetType() _
-            .GetProperty("DoubleBuffered", System.Reflection.BindingFlags.Instance Or System.Reflection.BindingFlags.NonPublic) _
-            .SetValue(TableSide0, True, Nothing)
-        TableSide1.GetType() _
-            .GetProperty("DoubleBuffered", System.Reflection.BindingFlags.Instance Or System.Reflection.BindingFlags.NonPublic) _
-            .SetValue(TableSide1, True, Nothing)
-
         _AccessType = AccessType
         _FloppyDrive = FloppyDrive
         _BPB = BPB
         ReDim _DiskBuffer(_BPB.ImageSize - 1)
-        Dim StatusTypeString = IIf(AccessType = FloppyAccessType.Read, "Reading", "Writing")
+        Dim StatusTypeString = If(AccessType = FloppyAccessType.Read, My.Resources.Label_Reading, My.Resources.Label_Writing)
 
-        Me.Text = StatusTypeString & " " & GetFloppyDiskFormatName(_BPB, False) & " Floppy"
+        Me.Text = StatusTypeString & " " & String.Format(My.Resources.Label_Floppy, FloppyDiskFormatGetName(_BPB, False))
         StatusType.Text = StatusTypeString
+        StatusBadSectors.Text = ""
+
+        btnAbort.Text = My.Resources.Label_Abort
 
         InitTables()
     End Sub
@@ -87,25 +85,39 @@ Public Class FloppyAccessForm
         End Set
     End Property
 
+    Public ReadOnly Property FileName As String
+        Get
+            Return _FileName
+        End Get
+    End Property
+
     Public ReadOnly Property TotalBadSectors As UInteger
         Get
             Return _TotalBadSectors
         End Get
     End Property
 
-    Private Function AddLabel(Text As String, BackColor As Color) As Label
-        Dim objLabel As New Label With {
-            .BorderStyle = BorderStyle.None,
-            .Margin = New Padding(0),
-            .TextAlign = ContentAlignment.MiddleCenter,
-            .UseMnemonic = False,
-            .AutoSize = False,
-            .Anchor = AnchorStyles.Top Or AnchorStyles.Left Or AnchorStyles.Right Or AnchorStyles.Bottom,
-            .BackColor = BackColor,
-            .Text = Text
-        }
+    Public Shared Function ReadDisk(FloppyDrive As FloppyInterface, BPB As BiosParameterBlock) As String
+        Using dlg As New FloppyAccessForm(FloppyDrive, BPB, FloppyAccessType.Read)
 
-        Return objLabel
+            dlg.ShowDialog(App.CurrentFormInstance)
+
+            Return dlg.FileName
+        End Using
+    End Function
+
+    Public Shared Sub WriteDisk(FloppyDrive As FloppyInterface, BPB As BiosParameterBlock, DiskBuffer As Byte(), DoFormat As Boolean, DoVerify As Boolean)
+        Using dlg As New FloppyAccessForm(FloppyDrive, BPB, FloppyAccessType.Write) With {
+                .DiskBuffer = DiskBuffer,
+                .DoFormat = DoFormat,
+                .DoVerify = DoVerify
+            }
+            dlg.ShowDialog(App.CurrentFormInstance)
+        End Using
+    End Sub
+
+    Public Function SectorToBytes(Sector As UInteger) As UInteger
+        Return Sector * BYTES_PER_SECTOR
     End Function
 
     Private Sub ClearFlags()
@@ -116,7 +128,7 @@ Public Class FloppyAccessForm
     End Sub
 
     Private Function ConfirmAbort() As Boolean
-        Dim Msg = "Are you sure you wish to abort?"
+        Dim Msg = My.Resources.Dialog_Abort
         Dim MsgBoxResult = MsgBox(Msg, MsgBoxStyle.YesNo Or MsgBoxStyle.DefaultButton2)
 
         If MsgBoxResult = MsgBoxResult.No Then
@@ -301,7 +313,7 @@ Public Class FloppyAccessForm
     Private Function FormatTrack(Sector As UInteger) As Boolean
         Dim Track = _BPB.SectorToTrack(Sector)
         Dim Side = _BPB.SectorToSide(Sector)
-        Dim MediaType As FloppyInterface.MEDIA_TYPE = GetMediaTypeFromDiskType(GetFloppyDiskFormat(_BPB, False))
+        Dim MediaType As FloppyInterface.MEDIA_TYPE = GetMediaTypeFromDiskType(FloppyDiskFormatGet(_BPB))
 
         If MediaType = FloppyInterface.MEDIA_TYPE.Unknown Then
             Return False
@@ -354,39 +366,67 @@ Public Class FloppyAccessForm
         End Select
     End Function
 
-    Private Function GetStatusText(Status As TrackStatus) As String
+    Private Function GetStatusError(Status As TrackStatus, Track As UShort, Side As UShort) As String
         Select Case Status
             Case TrackStatus.Reading
-                Return "Reading"
+                Return String.Format(My.Resources.Dialog_FloppyError_Reading, Track, Side)
             Case TrackStatus.Writing
-                Return "Writing"
+                Return String.Format(My.Resources.Dialog_FloppyError_Writing, Track, Side)
             Case TrackStatus.Verifying
-                Return "Verifying"
+                Return String.Format(My.Resources.Dialog_FloppyError_Verifying, Track, Side)
             Case TrackStatus.Formatting
-                Return "Formatting"
+                Return String.Format(My.Resources.Dialog_FloppyError_Formatting, Track, Side)
             Case Else
                 Return ""
         End Select
     End Function
+
+    Private Function GetStatusText(Status As TrackStatus) As String
+        Select Case Status
+            Case TrackStatus.Reading
+                Return My.Resources.Label_Reading
+            Case TrackStatus.Writing
+                Return My.Resources.Label_Writing
+            Case TrackStatus.Verifying
+                Return My.Resources.Label_Verifying
+            Case TrackStatus.Formatting
+                Return My.Resources.Label_Formatting
+            Case Else
+                Return ""
+        End Select
+    End Function
+
     Private Function HandleError() As Boolean
         Dim Track = _BPB.SectorToTrack(_SectorData.SectorStart)
         Dim Side = _BPB.SectorToSide(_SectorData.SectorStart)
         Dim BadSectors = _SectorData.SectorCount - _SectorData.SectorsProcessed
         Dim Msg As String
         If _AccessType = FloppyAccessType.Read Then
-            Msg = "Error Reading " & BadSectors & " Sector".Pluralize(BadSectors) & " in Track " & Track & ", Side " & Side & "."
+            If BadSectors = 1 Then
+                Msg = String.Format(My.Resources.Dialog_FloppyError_Sector, BadSectors, Track, Side)
+            Else
+                Msg = String.Format(My.Resources.Dialog_FloppyError_Sectors, BadSectors, Track, Side)
+            End If
         Else
-            Msg = "Error " & GetStatusText(_LastStatus) & " Track " & Track & ", Side " & Side & "."
+            Msg = GetStatusError(_LastStatus, Track, Side)
         End If
         Dim MsgBoxResult = MsgBox(Msg, MsgBoxStyle.AbortRetryIgnore Or MsgBoxStyle.DefaultButton2)
 
         If MsgBoxResult = MsgBoxResult.Abort Then
             _TotalBadSectors += BadSectors
-            StatusBadSectors.Text = _TotalBadSectors & " Bad Sector".Pluralize(_TotalBadSectors)
+            If _TotalBadSectors = 1 Then
+                StatusBadSectors.Text = _TotalBadSectors & " " & My.Resources.Label_BadSector
+            Else
+                StatusBadSectors.Text = _TotalBadSectors & " " & My.Resources.Label_BadSectors
+            End If
             Return False
         ElseIf MsgBoxResult = MsgBoxResult.Ignore Then
             _TotalBadSectors += BadSectors
-            StatusBadSectors.Text = _TotalBadSectors & " Bad Sector".Pluralize(_TotalBadSectors)
+            If _TotalBadSectors = 1 Then
+                StatusBadSectors.Text = _TotalBadSectors & " " & My.Resources.Label_BadSector
+            Else
+                StatusBadSectors.Text = _TotalBadSectors & " " & My.Resources.Label_BadSectors
+            End If
             Dim SectorStart = _SectorData.SectorStart + _BPB.SectorsPerTrack
             If SectorStart < _BPB.SectorCount Then
                 _SectorData = New SectorData(SectorStart, _BPB.SectorsPerTrack)
@@ -403,55 +443,33 @@ Public Class FloppyAccessForm
     End Function
 
     Private Sub InitTables()
-        Dim objLabel As Label
         Dim Tracks = _BPB.SectorToTrack(_BPB.SectorCount)
-        Dim TrackColor As Color
 
-        For Col = 1 To 10
-            objLabel = AddLabel(Col - 1, SystemColors.Control)
-            TableSide0Outer.Controls.Add(objLabel, Col, 0)
-
-            objLabel = AddLabel(Col - 1, SystemColors.Control)
-            TableSide1Outer.Controls.Add(objLabel, Col, 0)
+        TableSide0.Side = 0
+        TableSide0.TrackCount = 80
+        TableSide0.ActiveTrackCount = Tracks
+        For Counter = 0 To TableSide0.TrackCount - 1
+            TableSide0.ResetCell(Counter)
         Next
-        For Row = 1 To 8
-            objLabel = AddLabel(Row - 1, SystemColors.Control)
-            TableSide0Outer.Controls.Add(objLabel, 0, Row)
 
-            objLabel = AddLabel(Row - 1, SystemColors.Control)
-            TableSide1Outer.Controls.Add(objLabel, 0, Row)
+        TableSide1.Side = 1
+        TableSide1.TrackCount = 80
+        TableSide1.ActiveTrackCount = Tracks
+        For Counter = 0 To TableSide1.TrackCount - 1
+            TableSide1.ResetCell(Counter)
         Next
-        For Row = 0 To TableSide0.RowCount - 1
-            For Col = 0 To TableSide0.ColumnCount - 1
-                Dim CurrentTrack As UShort = Row * 10 + Col
-
-                If CurrentTrack < Tracks Then
-                    TrackColor = Color.White
-                Else
-                    TrackColor = Color.LightGray
-                End If
-                objLabel = AddLabel("", TrackColor)
-                TableSide0.Controls.Add(objLabel, Col, Row)
-
-                If CurrentTrack < Tracks And _BPB.NumberOfHeads > 1 Then
-                    TrackColor = Color.White
-                Else
-                    TrackColor = Color.LightGray
-                End If
-                objLabel = AddLabel("", TrackColor)
-                TableSide1.Controls.Add(objLabel, Col, Row)
-            Next
-        Next
+        TableSide1.Disabled = _BPB.NumberOfHeads < 2
     End Sub
+
     Private Sub ReadSectorsBySector(DiskBuffer() As Byte, SectorData As SectorData)
-        Dim BufferSize = Disk.BYTES_PER_SECTOR
+        Dim BufferSize = BYTES_PER_SECTOR
         Dim Buffer(BufferSize - 1) As Byte
         For Count = 0 To SectorData.SectorCount - 1
             If Not SectorData.SectorStatus(Count) Then
                 Dim Sector = SectorData.SectorStart + Count
                 Dim BytesRead = _FloppyDrive.ReadSector(Sector, Buffer)
                 If BytesRead = Buffer.Length Then
-                    Buffer.CopyTo(DiskBuffer, Disk.SectorToBytes(Sector))
+                    Buffer.CopyTo(DiskBuffer, SectorToBytes(Sector))
                     SectorData.SectorsProcessed += 1
                     SectorData.SectorStatus(Count) = True
                 End If
@@ -460,12 +478,12 @@ Public Class FloppyAccessForm
     End Sub
 
     Private Function ReadSectorsByTrack(DiskBuffer() As Byte, SectorData As SectorData) As Byte()
-        Dim BufferSize = Disk.BYTES_PER_SECTOR * SectorData.SectorCount
+        Dim BufferSize = BYTES_PER_SECTOR * SectorData.SectorCount
         Dim Buffer(BufferSize - 1) As Byte
         Dim BytesRead = _FloppyDrive.ReadSector(SectorData.SectorStart, Buffer)
         If BytesRead = Buffer.Length Then
             If DiskBuffer IsNot Nothing Then
-                Buffer.CopyTo(DiskBuffer, Disk.SectorToBytes(SectorData.SectorStart))
+                Buffer.CopyTo(DiskBuffer, SectorToBytes(SectorData.SectorStart))
             End If
             SectorData.SectorsProcessed = SectorData.SectorCount
             For Count = 0 To SectorData.SectorCount - 1
@@ -481,12 +499,12 @@ Public Class FloppyAccessForm
         Return Buffer
     End Function
     Private Sub WriteSectorsBySector(DiskBuffer() As Byte, SectorData As SectorData)
-        Dim BufferSize = Disk.BYTES_PER_SECTOR
+        Dim BufferSize = BYTES_PER_SECTOR
         Dim Buffer(BufferSize - 1) As Byte
         For Count = 0 To SectorData.SectorCount - 1
             If Not SectorData.SectorStatus(Count) Then
                 Dim Sector = SectorData.SectorStart + Count
-                Array.Copy(_DiskBuffer, Disk.SectorToBytes(Sector), Buffer, 0, Buffer.Length)
+                Array.Copy(_DiskBuffer, SectorToBytes(Sector), Buffer, 0, Buffer.Length)
                 Dim BytesWritten = _FloppyDrive.WriteSector(Sector, Buffer)
                 If BytesWritten = Buffer.Length Then
                     SectorData.SectorsProcessed += 1
@@ -497,9 +515,9 @@ Public Class FloppyAccessForm
     End Sub
 
     Private Function WriteSectorsByTrack(DiskBuffer() As Byte, SectorData As SectorData) As Byte()
-        Dim BufferSize = Disk.BYTES_PER_SECTOR * SectorData.SectorCount
+        Dim BufferSize = BYTES_PER_SECTOR * SectorData.SectorCount
         Dim Buffer(BufferSize - 1) As Byte
-        Array.Copy(_DiskBuffer, Disk.SectorToBytes(SectorData.SectorStart), Buffer, 0, Buffer.Length)
+        Array.Copy(_DiskBuffer, SectorToBytes(SectorData.SectorStart), Buffer, 0, Buffer.Length)
         Dim BytesWritten = _FloppyDrive.WriteSector(SectorData.SectorStart, Buffer)
         If BytesWritten = Buffer.Length Then
             SectorData.SectorsProcessed = SectorData.SectorCount
@@ -531,7 +549,7 @@ Public Class FloppyAccessForm
         Dim TrackInfo As TrackInfo = e.UserState
         Dim Track = _BPB.SectorToTrack(TrackInfo.Sector)
         Dim Side = _BPB.SectorToSide(TrackInfo.Sector)
-        Dim Table As TableLayoutPanel
+        Dim Table As FloppyTrackGrid
 
         If Side = 0 Then
             Table = TableSide0
@@ -542,23 +560,22 @@ Public Class FloppyAccessForm
         End If
 
         If Table IsNot Nothing Then
-            Dim Row As Integer = Track \ 10
-            Dim Col As Integer = Track Mod 10
-            Dim objLabel As Label = Table.GetControlFromPosition(Col, Row)
             Dim StatusText = GetStatusText(TrackInfo.Status)
             If StatusText <> "" Then
                 StatusType.Text = StatusText
             End If
-            objLabel.BackColor = GetStatusColor(TrackInfo.Status)
+
+            Dim Text As String = ""
+            Dim BackColor = GetStatusColor(TrackInfo.Status)
             If TrackInfo.BadSectors > 0 Then
-                objLabel.Text = TrackInfo.BadSectors
-            Else
-                objLabel.Text = ""
+                Text = TrackInfo.BadSectors
             End If
+
+            Table.SetCell(Track, Text:=Text, BackColor:=BackColor)
         End If
 
-        StatusTrack.Text = "Track " & Track
-        StatusSide.Text = "Side " & Side
+        StatusTrack.Text = My.Resources.Label_Track & " " & Track
+        StatusSide.Text = My.Resources.Label_Side & " " & Side
     End Sub
 
     Private Sub BackgroundWorker1_RunWorkerCompleted(sender As Object, e As RunWorkerCompletedEventArgs) Handles BackgroundWorker1.RunWorkerCompleted
@@ -569,20 +586,40 @@ Public Class FloppyAccessForm
                 Exit Sub
             End If
         End If
+
         If Not _Complete Then
             If Not ConfirmAbort() Then
                 Exit Sub
             End If
+            StatusType.Text = My.Resources.Label_Aborted
+        Else
+            StatusType.Text = My.Resources.Label_Complete
         End If
 
         If _AccessType = FloppyAccessType.Write Then
             If _Complete Then
-                Dim Msg As String = $"Your disk has been written successfully.{vbCrLf}{vbCrLf}Please remove the disk from the drive and write protect it now.{vbCrLf}{vbCrLf}Warning: If you continue without write protecting the disk, The operating system may make modifications to the disk as soon as you close this window."
+                Dim Msg = String.Format(My.Resources.Dialog_DiskWrittenSuccessfully, Environment.NewLine)
                 MsgBox(Msg, MsgBoxStyle.Information)
+            End If
+        Else
+            If _Complete Then
+                _FileName = GenerateOutputFile(".ima")
+                Try
+                    IO.File.WriteAllBytes(_FileName, _DiskBuffer)
+                Catch ex As Exception
+                    MsgBox(My.Resources.Dialog_SaveFileError2, MsgBoxStyle.Exclamation)
+                    _FileName = ""
+                End Try
+
+                If Not String.IsNullOrEmpty(_FileName) Then
+                    Me.Hide()
+                End If
             End If
         End If
 
-        Me.Hide()
+        btnAbort.Text = WithoutHotkey(My.Resources.Menu_Close)
+
+        'Me.Hide()
     End Sub
 
     Private Sub FloppyAccessForm_Activated(sender As Object, e As EventArgs) Handles Me.Activated
@@ -600,7 +637,6 @@ Public Class FloppyAccessForm
             End If
         End If
     End Sub
-
 
 #End Region
 
@@ -641,5 +677,4 @@ Public Class FloppyAccessForm
         Public ReadOnly Property Sector As UInteger
         Public Property Status As TrackStatus
     End Class
-
 End Class

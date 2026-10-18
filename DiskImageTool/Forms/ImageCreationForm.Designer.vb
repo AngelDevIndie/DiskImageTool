@@ -34,13 +34,14 @@ Partial Class ImageCreationForm
         Dim RadioFormatProCopy As System.Windows.Forms.RadioButton
         Dim RadioFormatDMF2048 As System.Windows.Forms.RadioButton
         Dim RadioFormatDMF1024 As System.Windows.Forms.RadioButton
-        Me.Panel1 = New System.Windows.Forms.Panel()
-        Me.BtnOK = New System.Windows.Forms.Button()
+        Dim PanelBottom As System.Windows.Forms.FlowLayoutPanel
+        Dim PanelMain As System.Windows.Forms.Panel
         Me.BtnCancel = New System.Windows.Forms.Button()
+        Me.BtnOK = New System.Windows.Forms.Button()
         Me.PanelFormats = New System.Windows.Forms.Panel()
-        Me.GroupBoxStandard = New System.Windows.Forms.GroupBox()
         Me.GroupBoxSpecial = New System.Windows.Forms.GroupBox()
-        Me.Label1 = New System.Windows.Forms.Label()
+        Me.GroupBoxStandard = New System.Windows.Forms.GroupBox()
+        Me.LabelBootSector = New System.Windows.Forms.Label()
         Me.ComboBootSector = New System.Windows.Forms.ComboBox()
         RadioFormat2880 = New System.Windows.Forms.RadioButton()
         RadioFormat1440 = New System.Windows.Forms.RadioButton()
@@ -54,78 +55,12 @@ Partial Class ImageCreationForm
         RadioFormatProCopy = New System.Windows.Forms.RadioButton()
         RadioFormatDMF2048 = New System.Windows.Forms.RadioButton()
         RadioFormatDMF1024 = New System.Windows.Forms.RadioButton()
-        Me.Panel1.SuspendLayout()
+        PanelBottom = New System.Windows.Forms.FlowLayoutPanel()
+        PanelMain = New System.Windows.Forms.Panel()
+        PanelBottom.SuspendLayout()
+        PanelMain.SuspendLayout()
         Me.PanelFormats.SuspendLayout()
         Me.SuspendLayout()
-        '
-        'Panel1
-        '
-        Me.Panel1.BackColor = System.Drawing.SystemColors.Control
-        Me.Panel1.Controls.Add(Me.BtnOK)
-        Me.Panel1.Controls.Add(Me.BtnCancel)
-        Me.Panel1.Dock = System.Windows.Forms.DockStyle.Bottom
-        Me.Panel1.Location = New System.Drawing.Point(0, 215)
-        Me.Panel1.Margin = New System.Windows.Forms.Padding(3, 3, 50, 3)
-        Me.Panel1.Name = "Panel1"
-        Me.Panel1.Size = New System.Drawing.Size(376, 42)
-        Me.Panel1.TabIndex = 3
-        '
-        'BtnOK
-        '
-        Me.BtnOK.Anchor = CType((System.Windows.Forms.AnchorStyles.Top Or System.Windows.Forms.AnchorStyles.Right), System.Windows.Forms.AnchorStyles)
-        Me.BtnOK.AutoSizeMode = System.Windows.Forms.AutoSizeMode.GrowAndShrink
-        Me.BtnOK.DialogResult = System.Windows.Forms.DialogResult.OK
-        Me.BtnOK.Location = New System.Drawing.Point(202, 10)
-        Me.BtnOK.Margin = New System.Windows.Forms.Padding(4, 10, 4, 9)
-        Me.BtnOK.Name = "BtnOK"
-        Me.BtnOK.Size = New System.Drawing.Size(75, 23)
-        Me.BtnOK.TabIndex = 0
-        Me.BtnOK.Text = "Ok"
-        Me.BtnOK.UseVisualStyleBackColor = True
-        '
-        'BtnCancel
-        '
-        Me.BtnCancel.Anchor = CType((System.Windows.Forms.AnchorStyles.Top Or System.Windows.Forms.AnchorStyles.Right), System.Windows.Forms.AnchorStyles)
-        Me.BtnCancel.AutoSizeMode = System.Windows.Forms.AutoSizeMode.GrowAndShrink
-        Me.BtnCancel.DialogResult = System.Windows.Forms.DialogResult.Cancel
-        Me.BtnCancel.Location = New System.Drawing.Point(285, 10)
-        Me.BtnCancel.Margin = New System.Windows.Forms.Padding(4, 10, 4, 9)
-        Me.BtnCancel.Name = "BtnCancel"
-        Me.BtnCancel.Size = New System.Drawing.Size(75, 23)
-        Me.BtnCancel.TabIndex = 1
-        Me.BtnCancel.Text = "Cancel"
-        Me.BtnCancel.UseVisualStyleBackColor = True
-        '
-        'PanelFormats
-        '
-        Me.PanelFormats.Controls.Add(RadioFormatTandy2000)
-        Me.PanelFormats.Controls.Add(RadioFormatProCopy)
-        Me.PanelFormats.Controls.Add(RadioFormatDMF2048)
-        Me.PanelFormats.Controls.Add(RadioFormatDMF1024)
-        Me.PanelFormats.Controls.Add(Me.GroupBoxSpecial)
-        Me.PanelFormats.Controls.Add(RadioFormat2880)
-        Me.PanelFormats.Controls.Add(RadioFormat1440)
-        Me.PanelFormats.Controls.Add(RadioFormat1200)
-        Me.PanelFormats.Controls.Add(RadioFormat720)
-        Me.PanelFormats.Controls.Add(RadioFormat360)
-        Me.PanelFormats.Controls.Add(RadioFormat320)
-        Me.PanelFormats.Controls.Add(RadioFormat180)
-        Me.PanelFormats.Controls.Add(RadioFormat160)
-        Me.PanelFormats.Controls.Add(Me.GroupBoxStandard)
-        Me.PanelFormats.Location = New System.Drawing.Point(16, 16)
-        Me.PanelFormats.Margin = New System.Windows.Forms.Padding(0)
-        Me.PanelFormats.Name = "PanelFormats"
-        Me.PanelFormats.Size = New System.Drawing.Size(344, 122)
-        Me.PanelFormats.TabIndex = 0
-        '
-        'GroupBoxStandard
-        '
-        Me.GroupBoxStandard.Location = New System.Drawing.Point(0, 0)
-        Me.GroupBoxStandard.Name = "GroupBoxStandard"
-        Me.GroupBoxStandard.Size = New System.Drawing.Size(161, 16)
-        Me.GroupBoxStandard.TabIndex = 0
-        Me.GroupBoxStandard.TabStop = False
-        Me.GroupBoxStandard.Text = "Standard Formats"
         '
         'RadioFormat2880
         '
@@ -217,15 +152,6 @@ Partial Class ImageCreationForm
         RadioFormat160.Text = "160K"
         RadioFormat160.UseVisualStyleBackColor = True
         '
-        'GroupBoxSpecial
-        '
-        Me.GroupBoxSpecial.Location = New System.Drawing.Point(181, 0)
-        Me.GroupBoxSpecial.Name = "GroupBoxSpecial"
-        Me.GroupBoxSpecial.Size = New System.Drawing.Size(161, 16)
-        Me.GroupBoxSpecial.TabIndex = 1
-        Me.GroupBoxSpecial.TabStop = False
-        Me.GroupBoxSpecial.Text = "Special Formats"
-        '
         'RadioFormatTandy2000
         '
         RadioFormatTandy2000.AutoSize = True
@@ -270,20 +196,113 @@ Partial Class ImageCreationForm
         RadioFormatDMF1024.Text = "DMF (1024 Clusters)"
         RadioFormatDMF1024.UseVisualStyleBackColor = True
         '
-        'Label1
+        'PanelBottom
         '
-        Me.Label1.AutoSize = True
-        Me.Label1.Location = New System.Drawing.Point(16, 151)
-        Me.Label1.Name = "Label1"
-        Me.Label1.Size = New System.Drawing.Size(63, 13)
-        Me.Label1.TabIndex = 1
-        Me.Label1.Text = "Boot Sector"
+        PanelBottom.BackColor = System.Drawing.SystemColors.Control
+        PanelBottom.Controls.Add(Me.BtnCancel)
+        PanelBottom.Controls.Add(Me.BtnOK)
+        PanelBottom.Dock = System.Windows.Forms.DockStyle.Bottom
+        PanelBottom.FlowDirection = System.Windows.Forms.FlowDirection.RightToLeft
+        PanelBottom.Location = New System.Drawing.Point(0, 210)
+        PanelBottom.Name = "PanelBottom"
+        PanelBottom.Padding = New System.Windows.Forms.Padding(6, 10, 6, 10)
+        PanelBottom.Size = New System.Drawing.Size(383, 43)
+        PanelBottom.TabIndex = 1
+        PanelBottom.WrapContents = False
+        '
+        'BtnCancel
+        '
+        Me.BtnCancel.AutoSizeMode = System.Windows.Forms.AutoSizeMode.GrowAndShrink
+        Me.BtnCancel.DialogResult = System.Windows.Forms.DialogResult.Cancel
+        Me.BtnCancel.Location = New System.Drawing.Point(290, 10)
+        Me.BtnCancel.Margin = New System.Windows.Forms.Padding(6, 0, 6, 0)
+        Me.BtnCancel.Name = "BtnCancel"
+        Me.BtnCancel.Size = New System.Drawing.Size(75, 23)
+        Me.BtnCancel.TabIndex = 1
+        Me.BtnCancel.Text = "{Cancel}"
+        Me.BtnCancel.UseVisualStyleBackColor = True
+        '
+        'BtnOK
+        '
+        Me.BtnOK.AutoSizeMode = System.Windows.Forms.AutoSizeMode.GrowAndShrink
+        Me.BtnOK.DialogResult = System.Windows.Forms.DialogResult.OK
+        Me.BtnOK.Location = New System.Drawing.Point(203, 10)
+        Me.BtnOK.Margin = New System.Windows.Forms.Padding(6, 0, 6, 0)
+        Me.BtnOK.Name = "BtnOK"
+        Me.BtnOK.Size = New System.Drawing.Size(75, 23)
+        Me.BtnOK.TabIndex = 0
+        Me.BtnOK.Text = "{Ok}"
+        Me.BtnOK.UseVisualStyleBackColor = True
+        '
+        'PanelMain
+        '
+        PanelMain.AutoSize = True
+        PanelMain.AutoSizeMode = System.Windows.Forms.AutoSizeMode.GrowAndShrink
+        PanelMain.BackColor = System.Drawing.SystemColors.Window
+        PanelMain.Controls.Add(Me.PanelFormats)
+        PanelMain.Controls.Add(Me.LabelBootSector)
+        PanelMain.Controls.Add(Me.ComboBootSector)
+        PanelMain.Dock = System.Windows.Forms.DockStyle.Fill
+        PanelMain.Location = New System.Drawing.Point(0, 0)
+        PanelMain.Name = "PanelMain"
+        PanelMain.Padding = New System.Windows.Forms.Padding(18, 18, 18, 6)
+        PanelMain.Size = New System.Drawing.Size(383, 210)
+        PanelMain.TabIndex = 0
+        '
+        'PanelFormats
+        '
+        Me.PanelFormats.Controls.Add(RadioFormatTandy2000)
+        Me.PanelFormats.Controls.Add(RadioFormatProCopy)
+        Me.PanelFormats.Controls.Add(RadioFormatDMF2048)
+        Me.PanelFormats.Controls.Add(RadioFormatDMF1024)
+        Me.PanelFormats.Controls.Add(Me.GroupBoxSpecial)
+        Me.PanelFormats.Controls.Add(RadioFormat2880)
+        Me.PanelFormats.Controls.Add(RadioFormat1440)
+        Me.PanelFormats.Controls.Add(RadioFormat1200)
+        Me.PanelFormats.Controls.Add(RadioFormat720)
+        Me.PanelFormats.Controls.Add(RadioFormat360)
+        Me.PanelFormats.Controls.Add(RadioFormat320)
+        Me.PanelFormats.Controls.Add(RadioFormat180)
+        Me.PanelFormats.Controls.Add(RadioFormat160)
+        Me.PanelFormats.Controls.Add(Me.GroupBoxStandard)
+        Me.PanelFormats.Location = New System.Drawing.Point(18, 18)
+        Me.PanelFormats.Margin = New System.Windows.Forms.Padding(0)
+        Me.PanelFormats.Name = "PanelFormats"
+        Me.PanelFormats.Size = New System.Drawing.Size(344, 122)
+        Me.PanelFormats.TabIndex = 0
+        '
+        'GroupBoxSpecial
+        '
+        Me.GroupBoxSpecial.Location = New System.Drawing.Point(181, 0)
+        Me.GroupBoxSpecial.Name = "GroupBoxSpecial"
+        Me.GroupBoxSpecial.Size = New System.Drawing.Size(161, 16)
+        Me.GroupBoxSpecial.TabIndex = 1
+        Me.GroupBoxSpecial.TabStop = False
+        Me.GroupBoxSpecial.Text = "{Special Formats}"
+        '
+        'GroupBoxStandard
+        '
+        Me.GroupBoxStandard.Location = New System.Drawing.Point(0, 0)
+        Me.GroupBoxStandard.Name = "GroupBoxStandard"
+        Me.GroupBoxStandard.Size = New System.Drawing.Size(161, 16)
+        Me.GroupBoxStandard.TabIndex = 0
+        Me.GroupBoxStandard.TabStop = False
+        Me.GroupBoxStandard.Text = "{Standard Formats}"
+        '
+        'LabelBootSector
+        '
+        Me.LabelBootSector.AutoSize = True
+        Me.LabelBootSector.Location = New System.Drawing.Point(18, 153)
+        Me.LabelBootSector.Name = "LabelBootSector"
+        Me.LabelBootSector.Size = New System.Drawing.Size(71, 13)
+        Me.LabelBootSector.TabIndex = 1
+        Me.LabelBootSector.Text = "{Boot Sector}"
         '
         'ComboBootSector
         '
         Me.ComboBootSector.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList
         Me.ComboBootSector.FormattingEnabled = True
-        Me.ComboBootSector.Location = New System.Drawing.Point(16, 167)
+        Me.ComboBootSector.Location = New System.Drawing.Point(18, 169)
         Me.ComboBootSector.Name = "ComboBootSector"
         Me.ComboBootSector.Size = New System.Drawing.Size(344, 21)
         Me.ComboBootSector.TabIndex = 2
@@ -292,12 +311,10 @@ Partial Class ImageCreationForm
         '
         Me.AutoScaleDimensions = New System.Drawing.SizeF(6.0!, 13.0!)
         Me.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font
-        Me.BackColor = System.Drawing.SystemColors.Window
-        Me.ClientSize = New System.Drawing.Size(376, 257)
-        Me.Controls.Add(Me.ComboBootSector)
-        Me.Controls.Add(Me.Label1)
-        Me.Controls.Add(Me.PanelFormats)
-        Me.Controls.Add(Me.Panel1)
+        Me.BackColor = System.Drawing.SystemColors.Control
+        Me.ClientSize = New System.Drawing.Size(383, 253)
+        Me.Controls.Add(PanelMain)
+        Me.Controls.Add(PanelBottom)
         Me.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedDialog
         Me.MaximizeBox = False
         Me.MinimizeBox = False
@@ -305,20 +322,20 @@ Partial Class ImageCreationForm
         Me.ShowIcon = False
         Me.ShowInTaskbar = False
         Me.StartPosition = System.Windows.Forms.FormStartPosition.CenterParent
-        Me.Text = "New Disk Image"
-        Me.Panel1.ResumeLayout(False)
+        PanelBottom.ResumeLayout(False)
+        PanelMain.ResumeLayout(False)
+        PanelMain.PerformLayout()
         Me.PanelFormats.ResumeLayout(False)
         Me.PanelFormats.PerformLayout()
         Me.ResumeLayout(False)
         Me.PerformLayout()
 
     End Sub
-    Friend WithEvents Panel1 As Panel
     Friend WithEvents BtnOK As Button
     Friend WithEvents BtnCancel As Button
     Friend WithEvents PanelFormats As Panel
     Friend WithEvents GroupBoxStandard As GroupBox
     Friend WithEvents GroupBoxSpecial As GroupBox
-    Friend WithEvents Label1 As Label
+    Friend WithEvents LabelBootSector As Label
     Friend WithEvents ComboBootSector As ComboBox
 End Class

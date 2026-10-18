@@ -5,22 +5,49 @@ Namespace Bitstream
     Module Functions
         Private ReadOnly ValidSectorCount() As Byte = {8, 9, 15, 18, 36}
 
-        Public Function BitstreamCalculateHash(Image As IBitstreamImage, HashAlgorithm As HashAlgorithm) As String
+        Public Function BitstreamCalculateHash(Image As IBitstreamImage, HashAlgorithm As HashAlgorithm, Optional AllTracks As Boolean = True) As String
             Dim BitstreamTrack As IBitstreamTrack
-            Dim OutputBuffer() As Byte
+            Dim TrackCount As UShort
 
-            For Track = 0 To Image.TrackCount - 1 Step Image.TrackStep
+            If AllTracks Then
+                TrackCount = Image.TrackCount
+            Else
+                TrackCount = StandardTrackCount(Image.TrackCount, Image.TrackStep)
+            End If
+
+            Dim NewTrackCount = Image.TrackCount \ Image.TrackStep
+
+            For Track = 0 To TrackCount - 1 Step Image.TrackStep
+                Dim NewTrack = Track \ Image.TrackStep
                 For Side = 0 To Image.SideCount - 1
                     BitstreamTrack = Image.GetTrack(Track, Side)
                     If BitstreamTrack IsNot Nothing AndAlso BitstreamTrack.MFMData IsNot Nothing Then
-                        For Each MFMSector In BitstreamTrack.MFMData.Sectors
-                            If MFMSector.DAMFound Then
-                                If MFMSector.InitialDataChecksumValid Then
-                                    OutputBuffer = New Byte(MFMSector.Data.Length - 1) {}
-                                    HashAlgorithm.TransformBlock(MFMSector.Data, 0, MFMSector.Data.Length, OutputBuffer, 0)
-                                End If
+                        Dim Sectors = BitstreamTrack.MFMData.Sectors
+                        Dim Count = Sectors.Count
+                        Dim IsMetadata As Boolean = False
+
+                        ' Skip metadata tracks
+                        If ((NewTrackCount = 41 And NewTrack = 40) Or (NewTrackCount = 81 And NewTrack = 80)) Then
+                            If Count = 1 AndAlso Sectors(0).SectorId = 1 Then
+                                IsMetadata = True
                             End If
-                        Next
+                        End If
+
+                        If Not IsMetadata Then
+                            Dim SectorIndex As Integer = BitstreamTrack.MFMData.SectorStartIndex
+                            For Counter = 0 To Count - 1
+                                Dim MFMSector = Sectors(SectorIndex)
+                                If MFMSector.DAMFound Then
+                                    If MFMSector.InitialDataChecksumValid Then
+                                        HashAlgorithm.TransformBlock(MFMSector.Data, 0, MFMSector.Data.Length, Nothing, 0)
+                                    End If
+                                End If
+                                SectorIndex += 1
+                                If SectorIndex = Count Then
+                                    SectorIndex = 0
+                                End If
+                            Next
+                        End If
                     End If
                 Next
             Next
@@ -29,12 +56,15 @@ Namespace Bitstream
             Return HashBytesToString(HashAlgorithm.Hash)
         End Function
 
-        Public Function BitstreamGetImageFormat(Image As IBitstreamImage) As FloppyDiskFormat
+        Public Function BitstreamGetImageFormat(Image As IBitstreamImage, BytesPerSector As UInteger) As FloppyDiskFormat
             Dim DiskFormat As FloppyDiskFormat
 
-            Dim SectorCount = InferSectorCount(Image)
+            Dim SectorCount = InferSectorCount(Image, BytesPerSector)
 
-            If Image.TrackCount \ Image.TrackStep >= 79 Then
+            If BytesPerSector = 1024 And SectorCount = 8 Then
+                DiskFormat = FloppyDiskFormat.Floppy2HD
+
+            ElseIf Image.TrackCount \ Image.TrackStep >= 79 Then
                 If SectorCount >= 36 Then
                     DiskFormat = FloppyDiskFormat.Floppy2880
                 ElseIf SectorCount >= 18 Then
@@ -77,18 +107,44 @@ Namespace Bitstream
             Return RoundRPM((60 * 1000000) / MicrosecondsPerRev)
         End Function
 
-        Public Function InferBitRate(BitCount As UInteger) As UShort
-            BitCount = Math.Round(BitCount / 10000) * 10000
+        Public Function GetBytesPerSector(Image As IBitstreamImage) As UInteger
+            Dim BytesPerSector As UInteger = 512
 
-            If BitCount <= 130000 Then
+            Dim Track = Image.GetTrack(0, 0)
+            If Track IsNot Nothing Then
+                Dim MFMData = Track.MFMData
+                If MFMData IsNot Nothing Then
+                    For Each Sector In MFMData.Sectors
+                        If Sector.SectorId = 1 Then
+                            BytesPerSector = Sector.GetSizeBytes
+                            Exit For
+                        End If
+                    Next
+                End If
+            End If
+
+            Return BytesPerSector
+        End Function
+
+        Public Function InferBitCount(BitCount As UInteger) As UInteger
+            Dim BitRate = InferBitRate(BitCount)
+            Dim RPM = InferRPM(BitCount)
+
+            Return IBM_MFM.MFMGetSize(RPM, BitRate)
+        End Function
+
+        Public Function InferBitRate(BitCount As UInteger) As UShort
+            BitCount = Math.Round(BitCount / 5000) * 5000
+
+            If BitCount <= 135000 Then
                 Return 250
-            ElseIf BitCount = 170000 Then
+            ElseIf BitCount >= 165000 And BitCount <= 175000 Then
                 Return 500
-            ElseIf BitCount = 200000 Then
+            ElseIf BitCount >= 195000 And BitCount <= 205000 Then
                 Return 500
-            ElseIf BitCount = 400000 Then
+            ElseIf BitCount >= 395000 And BitCount <= 405000 Then
                 Return 1000
-            ElseIf BitCount = 800000 Then
+            ElseIf BitCount >= 795000 And BitCount <= 805000 Then
                 Return 2000
             Else
                 Return 0
@@ -96,37 +152,37 @@ Namespace Bitstream
         End Function
 
         Public Function InferRPM(BitCount As UInteger) As UShort
-            BitCount = Math.Round(BitCount / 10000) * 10000
+            BitCount = Math.Round(BitCount / 5000) * 5000
 
-            If BitCount <= 130000 Then
+            If BitCount <= 135000 Then
                 Return 300
-            ElseIf BitCount = 170000 Then
+            ElseIf BitCount >= 165000 And BitCount <= 175000 Then
                 Return 360
-            ElseIf BitCount = 200000 Then
+            ElseIf BitCount >= 195000 And BitCount <= 205000 Then
                 Return 300
-            ElseIf BitCount = 400000 Then
+            ElseIf BitCount >= 395000 And BitCount <= 405000 Then
                 Return 300
             Else
                 Return 300
             End If
         End Function
         Public Function InferSectorCount(BitCount As UInteger) As UShort
-            BitCount = Math.Round(BitCount / 10000) * 10000
+            BitCount = Math.Round(BitCount / 5000) * 5000
 
-            If BitCount <= 130000 Then
+            If BitCount <= 135000 Then
                 Return 9
-            ElseIf BitCount = 170000 Then
+            ElseIf BitCount >= 165000 And BitCount <= 175000 Then
                 Return 15
-            ElseIf BitCount = 200000 Then
+            ElseIf BitCount >= 195000 And BitCount <= 205000 Then
                 Return 18
-            ElseIf BitCount = 400000 Then
+            ElseIf BitCount >= 395000 And BitCount <= 405000 Then
                 Return 36
             Else
                 Return 0
             End If
         End Function
 
-        Public Function InferSectorCount(Image As IBitstreamImage) As UShort
+        Public Function InferSectorCount(Image As IBitstreamImage, BytesPerSector As UInteger) As UShort
             Dim Track As IBitstreamTrack
             Dim SectorCount As Byte = 0
             Dim TotalSize As UShort
@@ -137,7 +193,7 @@ Namespace Bitstream
                     Track = Image.GetTrack(i, j)
                     If Track IsNot Nothing AndAlso Track.MFMData IsNot Nothing Then
                         TotalSize = GetSectorSize(Track.MFMData.Sectors)
-                        SectorCount = TotalSize \ 512
+                        SectorCount = TotalSize \ BytesPerSector
                         If ValidSectorCount.Contains(SectorCount) Then
                             CountFound = True
                             Exit For
@@ -165,6 +221,21 @@ Namespace Bitstream
         Public Function RoundRPM(RPM As UShort) As UShort
             Return Math.Round(RPM / 60) * 60
         End Function
+
+        Private Function StandardTrackCount(TrackCount As UShort, TrackStep As Byte) As UShort
+            Dim NewTrackCount = TrackCount \ TrackStep
+
+            If NewTrackCount > 40 And NewTrackCount < 43 Then
+                NewTrackCount = 40
+            ElseIf NewTrackCount > 80 Then
+                NewTrackCount = 80
+            End If
+
+            NewTrackCount = NewTrackCount * TrackStep
+
+            Return NewTrackCount
+        End Function
+
 
         Private Function GetSectorSize(Sectors As List(Of IBM_MFM.IBM_MFM_Sector)) As UShort
             Dim TotalSize As UShort = 0

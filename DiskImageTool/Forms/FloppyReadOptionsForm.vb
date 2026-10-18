@@ -1,4 +1,5 @@
 ﻿Imports DiskImageTool.DiskImage.FloppyDiskFunctions
+Imports Microsoft.SqlServer.Server
 
 Public Class FloppyReadOptionsForm
     Private _DiskFormat As FloppyDiskFormat = FloppyDiskFormat.FloppyUnknown
@@ -9,7 +10,16 @@ Public Class FloppyReadOptionsForm
         InitializeComponent()
 
         ' Add any initialization after the InitializeComponent() call.
+        LocalizeForm()
+
         PopulateCombo(DetectedType)
+    End Sub
+
+    Private Sub LocalizeForm()
+        BtnCancel.Text = My.Resources.Menu_Cancel
+        BtnOK.Text = My.Resources.Menu_Ok
+        Label1.Text = My.Resources.Label_FloppyDiskType
+        Me.Text = My.Resources.Label_ChooseDiskType
     End Sub
 
     Public ReadOnly Property DiskFormat As FloppyDiskFormat
@@ -18,13 +28,21 @@ Public Class FloppyReadOptionsForm
         End Get
     End Property
 
+    Public Shared Function Display(DetectedFormat As FloppyDiskFormat) As (Result As Boolean, Format As FloppyDiskFormat)
+        Using dlg As New FloppyReadOptionsForm(DetectedFormat)
+            dlg.ShowDialog(App.CurrentFormInstance)
+
+            Return (dlg.DialogResult = DialogResult.OK, dlg.DiskFormat)
+        End Using
+    End Function
+
     Private Sub PopulateCombo(DetectedType As FloppyDiskFormat)
         Dim DiskTypeItem As ComboDiskTypeItem
         ComboDiskType.BeginUpdate()
         ComboDiskType.Items.Clear()
 
         If DetectedType = FloppyDiskFormat.FloppyUnknown Then
-            lblMessage.Text = "Warning: Unable to determine the floppy disk type."
+            lblMessage.Text = My.Resources.Dialog_DiskTypeWarning
             DiskTypeItem = New ComboDiskTypeItem(DetectedType, False)
             Dim Index = ComboDiskType.Items.Add(DiskTypeItem)
             ComboDiskType.SelectedIndex = Index
@@ -34,7 +52,7 @@ Public Class FloppyReadOptionsForm
 
         Dim Items = System.Enum.GetValues(GetType(FloppyDiskFormat))
         For Each DiskFormat As FloppyDiskFormat In Items
-            If (DiskFormat <> FloppyDiskFormat.FloppyUnknown And IsDiskFormatValidForRead(DiskFormat)) Or DetectedType = DiskFormat Then
+            If (DiskFormat <> FloppyDiskFormat.FloppyUnknown And FloppyDiskFormatIsStandard(DiskFormat)) Or DetectedType = DiskFormat Then
                 DiskTypeItem = New ComboDiskTypeItem(DiskFormat, DiskFormat = DetectedType)
                 Dim Index = ComboDiskType.Items.Add(DiskTypeItem)
                 If DiskFormat = DetectedType Then
@@ -78,12 +96,12 @@ Public Class FloppyReadOptionsForm
             Dim FormatName As String
 
             If _Format = FloppyDiskFormat.FloppyUnknown Then
-                FormatName = "Unknown"
+                FormatName = My.Resources.Label_Unknown
             Else
-                FormatName = GetFloppyDiskFormatName(_Format) & " Floppy"
+                FormatName = String.Format(My.Resources.Label_Floppy, FloppyDiskFormatGetName(_Format))
             End If
 
-            Return FormatName & IIf(_Detected, " (Detected)", "")
+            Return FormatName & If(_Detected, " " & InParens(My.Resources.Label_Detected), "")
         End Function
     End Class
 

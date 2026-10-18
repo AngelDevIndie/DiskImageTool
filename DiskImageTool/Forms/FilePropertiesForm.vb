@@ -17,7 +17,33 @@ Public Class FilePropertiesForm
         InitializeComponent()
 
         ' Add any initialization after the InitializeComponent() call.
+        LocalizeForm()
+    End Sub
 
+    Private Sub LocalizeForm()
+        BtnArchive.Text = WithoutHotkey(My.Resources.Menu_Edit)
+        BtnCancel.Text = My.Resources.Menu_Cancel
+        BtnCreated.Text = WithoutHotkey(My.Resources.Menu_Edit)
+        BtnHidden.Text = WithoutHotkey(My.Resources.Menu_Edit)
+        BtnLastAccessed.Text = WithoutHotkey(My.Resources.Menu_Edit)
+        BtnLastWritten.Text = WithoutHotkey(My.Resources.Menu_Edit)
+        BtnReadOnly.Text = WithoutHotkey(My.Resources.Menu_Edit)
+        BtnSystem.Text = WithoutHotkey(My.Resources.Menu_Edit)
+        BtnUpdate.Text = My.Resources.Menu_Update
+        ChkArchive.Text = My.Resources.Label_Archive
+        ChkHidden.Text = My.Resources.Label_Hidden
+        ChkNTExtensions.Text = My.Resources.Label_NTExtensions
+        ChkReadOnly.Text = My.Resources.Label_ReadOnly
+        ChkSystem.Text = My.Resources.Label_System
+        GroupAttributes.Text = My.Resources.Label_Attributes
+        GroupFileDates.Text = My.Resources.Label_FileDates
+        GroupFileName.Text = My.Resources.Label_FileName
+        LblCreated.Text = My.Resources.Label_Created
+        LblLastAccessed.Text = My.Resources.Label_LastAccessed
+        LblLastWritten.Text = My.Resources.Label_LastWritten
+        LblMultipleFiles.Text = My.Resources.Caption_MultipleFilesSelected
+        Me.Text = My.Resources.Label_FileProperties
+        RadioFileLong.Text = My.Resources.Label_Long
     End Sub
 
     Public Property Deleted As Boolean
@@ -42,12 +68,6 @@ Public Class FilePropertiesForm
         Set(value As Boolean)
             _IsVolumeLabel = value
         End Set
-    End Property
-
-    Public ReadOnly Property LFN As String
-        Get
-            Return TxtLFN.Text
-        End Get
     End Property
 
     Public ReadOnly Property UseNTExtensions As Boolean
@@ -301,7 +321,7 @@ Public Class FilePropertiesForm
     Private Sub ToggleButton(Button As Button, Enabled As Boolean, Optional Visible As Boolean = True)
         Button.Visible = Visible
         Button.Tag = Enabled
-        Button.BackColor = IIf(Enabled, Color.LightGreen, SystemColors.Control)
+        Button.BackColor = If(Enabled, Color.LightGreen, SystemColors.Control)
         Button.UseVisualStyleBackColor = Not Enabled
         ToggleRelatedControls(Button)
     End Sub
@@ -467,12 +487,11 @@ Public Class FilePropertiesForm
         For i = 0 To Value.Length - 1
             If InvalidChars.Contains(Value.Substring(i, 1)) Then
                 e.Cancel = True
-                Dim msg As String = "A file name can't contain any of the following characters:" & vbCrLf & StrDup(16, " ") & "\ / :  * ? "" < > |"
+                Dim msg As String = My.Resources.Dialog_InvalidCharacters & ":" & vbCrLf & StrDup(16, " ") & "\ / :  * ? "" < > |"
                 MsgBox(msg, MsgBoxStyle.Exclamation)
                 Exit For
             End If
         Next
     End Sub
 #End Region
-
 End Class

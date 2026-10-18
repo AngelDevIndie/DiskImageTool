@@ -2,131 +2,255 @@
 Imports DiskImageTool.Bitstream
 Imports DiskImageTool.DiskImage
 
-Namespace ImageFormats
-    Namespace IMD
-        Public Class IMDFloppyImage
-            Inherits MappedFloppyImage
-            Implements IFloppyImage
+Namespace ImageFormats.IMD
+    Public Class IMDFloppyImage
+        Inherits MappedFloppyImage
+        Implements IFloppyImage
+        Implements IImageFieldSource
 
-            Private ReadOnly _Image As IMDImage
+        Private Enum IMDImageField As UShort
+            Comment = 1
+            ChecksumError = 2
+        End Enum
 
-            Public Sub New(Image As IMDImage, DiskFormat As FloppyDiskFormat)
-                MyBase.New(Nothing)
+        Public Structure IMDChecksumErrorEdit
+            Public TrackIndex As Integer
+            Public SectorIndex As Integer
+            Public Value As Boolean
 
-                _Image = Image
-
-                BuildSectorMap()
-                InitDiskFormat(DiskFormat)
+            Public Sub New(TrackIndex As Integer, SectorIndex As Integer, Value As Boolean)
+                Me.TrackIndex = TrackIndex
+                Me.SectorIndex = SectorIndex
+                Me.Value = Value
             End Sub
+        End Structure
 
-            Public ReadOnly Property Image As IMDImage
-                Get
-                    Return _Image
-                End Get
-            End Property
+        Private ReadOnly _Image As IMDImage
 
-            Public Overrides ReadOnly Property ImageType As FloppyImageType Implements IFloppyImage.ImageType
-                Get
-                    Return FloppyImageType.IMDImage
-                End Get
-            End Property
+        Public Sub New(Image As IMDImage, DiskFormat As FloppyDiskFormat, BytesPerSector As UInteger)
+            MyBase.New(Nothing, BytesPerSector)
 
-            Public Overrides Function GetCRC32() As String Implements IFloppyImage.GetCRC32
-                Using Hasher As CRC32Hash = CRC32Hash.Create()
-                    Return CalculateHash(Hasher)
-                End Using
-            End Function
+            _Image = Image
 
-            Public Overrides Function GetMD5Hash() As String Implements IFloppyImage.GetMD5Hash
-                Using Hasher As MD5 = MD5.Create()
-                    Return CalculateHash(Hasher)
-                End Using
-            End Function
+            BuildSectorMap()
+            InitDiskFormat(DiskFormat)
+        End Sub
 
-            Public Overrides Function GetSHA1Hash() As String Implements IFloppyImage.GetSHA1Hash
-                Using Hasher As SHA1 = SHA1.Create()
-                    Return CalculateHash(Hasher)
-                End Using
-            End Function
+        Public ReadOnly Property Image As IMDImage
+            Get
+                Return _Image
+            End Get
+        End Property
 
-            Private Sub BuildSectorMap()
-                SetTracks(_Image.TrackCount, _Image.SideCount)
+        Public Overrides ReadOnly Property ImageType As FloppyImageType Implements IFloppyImage.ImageType
+            Get
+                Return FloppyImageType.IMDImage
+            End Get
+        End Property
 
-                For Each Track In _Image.Tracks
-                    Dim TrackData = SetTrack(Track.Track, Track.Side)
-                    TrackData.SectorSize = Track.GetSizeBytes
-                    TrackData.Encoding = GetEncoding(Track.Mode)
+        Public Overrides Function GetCRC32() As String Implements IFloppyImage.GetCRC32
+            Using Hasher As CRC32Hash = CRC32Hash.Create()
+                Return CalculateHash(Hasher)
+            End Using
+        End Function
 
+        Public Overrides Function GetMD5Hash() As String Implements IFloppyImage.GetMD5Hash
+            Using Hasher As MD5 = MD5.Create()
+                Return CalculateHash(Hasher)
+            End Using
+        End Function
+
+        Public Overrides Function GetSHA1Hash() As String Implements IFloppyImage.GetSHA1Hash
+            Using Hasher As SHA1 = SHA1.Create()
+                Return CalculateHash(Hasher)
+            End Using
+        End Function
+
+        Public Sub SetImageField(IsTrackField As Boolean, Track As UShort, Side As Byte, Sector As UShort, FieldId As UShort, Value As Object) Implements IImageFieldSource.SetImageField
+            Dim Field = CType(FieldId, IMDImageField)
+            Dim RefreshMap As Boolean
+
+            If Field = IMDImageField.ChecksumError Then
+                If IsTrackField AndAlso TypeOf Value Is Boolean Then
+                    SetChecksumError(Track, Sector, CBool(Value))
+                    RefreshMap = True
+                End If
+            ElseIf Not IsTrackField AndAlso Field = IMDImageField.Comment AndAlso TypeOf Value Is String Then
+                _Image.Comment = CStr(Value)
+            End If
+
+            If RefreshMap Then
+                BuildSectorMap()
+                InitProtectedSectors()
+            End If
+        End Sub
+
+        Public Function UpdateProperties(Comment As String, ChecksumErrors As IEnumerable(Of IMDChecksumErrorEdit)) As Boolean
+            Dim Changes As New List(Of ImageFieldChange)
+            Dim OriginalComment = If(_Image.Comment, "")
+            Dim NewComment = If(Comment, "")
+            If Not String.Equals(OriginalComment, NewComment, StringComparison.Ordinal) Then
+                Changes.Add(New ImageFieldChange(False, 0, 0, 0, IMDImageField.Comment, OriginalComment, NewComment))
+            End If
+
+            If ChecksumErrors IsNot Nothing Then
+                For Each Edit In ChecksumErrors
+                    If Edit.TrackIndex < 0 OrElse Edit.TrackIndex >= _Image.Tracks.Count OrElse Edit.TrackIndex > UShort.MaxValue Then
+                        Continue For
+                    End If
+
+                    Dim EditedTrack = _Image.Tracks(Edit.TrackIndex)
+                    If Edit.SectorIndex < 0 OrElse Edit.SectorIndex >= EditedTrack.Sectors.Count OrElse Edit.SectorIndex > UShort.MaxValue Then
+                        Continue For
+                    End If
+
+                    Dim Original = EditedTrack.Sectors(Edit.SectorIndex).ChecksumError
+                    If Original = Edit.Value Then
+                        Continue For
+                    End If
+
+                    Changes.Add(New ImageFieldChange(True, CUShort(Edit.TrackIndex), EditedTrack.Side, CUShort(Edit.SectorIndex), IMDImageField.ChecksumError, Original, Edit.Value))
+                Next
+            End If
+
+            Return History.CommitImageFields(Changes)
+        End Function
+
+        Private Sub SetChecksumError(TrackIndex As UShort, SectorIndex As UShort, Value As Boolean)
+            If TrackIndex >= _Image.Tracks.Count Then
+                Exit Sub
+            End If
+
+            Dim Sectors = _Image.Tracks(TrackIndex).Sectors
+            If SectorIndex >= Sectors.Count Then
+                Exit Sub
+            End If
+
+            Sectors(SectorIndex).ChecksumError = Value
+        End Sub
+
+        Private Sub BuildSectorMap()
+            Dim TrackData As TrackData
+
+            SetTracks(_Image.TrackCount, _Image.SideCount)
+
+            For Each Track In _Image.Tracks
+                TrackData = SetTrack(Track.Track, Track.Side)
+                TrackData.SectorSize = Track.GetSizeBytes
+                TrackData.Encoding = GetEncoding(Track.Mode)
+                TrackData.FirstSectorId = Track.FirstSectorId
+                TrackData.LastSectorId = Track.LastSectorId
+                TrackData.SectorCount = Track.Sectors.Count
+
+                If TrackData.FirstSectorId = 1 And TrackData.LastSectorId = 4 And TrackData.SectorSize = 1024 Then
+                    ProcessSectors1024(Track)
+                Else
+                    ProcessSectors(Track)
+                End If
+            Next
+        End Sub
+
+        Public Overrides Function SaveToFile(FilePath As String) As Boolean Implements IFloppyImage.SaveToFile
+            Return _Image.Export(FilePath)
+        End Function
+
+        Private Function CalculateHash(HashAlgorithm As HashAlgorithm) As String
+            For Each Track In _Image.Tracks
+                If Track.IsMFM Then
                     For Each Sector In Track.Sectors
-                        If TrackData.FirstSector = -1 Or Sector.SectorId < TrackData.FirstSector Then
-                            TrackData.FirstSector = Sector.SectorId
-                        End If
-
-                        If Sector.SectorId > TrackData.LastSector Then
-                            TrackData.LastSector = Sector.SectorId
-                        End If
-
-                        If Sector.SectorId >= 1 And Sector.SectorId <= SECTOR_COUNT Then
-                            Dim IsStandard = IsStandardSector(Track, Sector)
-                            If IsStandard Then
-                                Dim BitstreamSector = GetSector(Track.Track, Track.Side, Sector.SectorId)
-                                If BitstreamSector Is Nothing Then
-                                    BitstreamSector = New BitstreamSector(Sector.Data, Sector.Data.Length) With {
-                                        .IsStandard = IsStandard
-                                    }
-                                    SetSector(Track.Track, Track.Side, Sector.SectorId, BitstreamSector)
-                                Else
-                                    BitstreamSector.IsStandard = False
-                                End If
-                            End If
+                        If Not Sector.Unavailable And Not Sector.ChecksumError Then
+                            HashAlgorithm.TransformBlock(Sector.Data, 0, Sector.Data.Length, Nothing, 0)
                         End If
                     Next
-                Next
-            End Sub
+                End If
+            Next
+            HashAlgorithm.TransformFinalBlock(New Byte(0) {}, 0, 0)
 
-            Private Function CalculateHash(HashAlgorithm As HashAlgorithm) As String
-                Dim OutputBuffer() As Byte
+            Return HashBytesToString(HashAlgorithm.Hash)
+        End Function
 
-                For Each Track In _Image.Tracks
-                    If Track.IsMFM Then
-                        For Each Sector In Track.Sectors
-                            If Not Sector.Unavailable And Not Sector.ChecksumError Then
-                                OutputBuffer = New Byte(Sector.Data.Length - 1) {}
-                                HashAlgorithm.TransformBlock(Sector.Data, 0, Sector.Data.Length, OutputBuffer, 0)
-                            End If
-                        Next
+        Private Function GetEncoding(Mode As TrackMode) As BitstreamTrackType
+            If Mode = TrackMode.FM250kbps Or Mode = TrackMode.FM300kbps Or Mode = TrackMode.FM500kbps Then
+                Return BitstreamTrackType.FM
+            ElseIf Mode = TrackMode.MFM250kbps Or Mode = TrackMode.MFM300kbps Or Mode = TrackMode.MFM500kbps Then
+                Return BitstreamTrackType.MFM
+            Else
+                Return BitstreamTrackType.Other
+            End If
+        End Function
+
+        Private Function IsMappableSector(Track As IMDTrack, Sector As IMDSector, MaxSectors As Byte) As Boolean
+            If Sector.SectorId < 1 Or Sector.SectorId > MaxSectors Then
+                Return False
+            End If
+
+            ' Checksum-error sectors are still mapped. ImageDisk stores their data.
+            If Sector.Unavailable Or Sector.Deleted Or Sector.Data Is Nothing Then
+                Return False
+            End If
+
+            If Sector.Track <> Track.Track Or Sector.Side <> Track.Side Then
+                Return False
+            End If
+
+            Return True
+        End Function
+
+        Private Function IsStandardSector(Track As IMDTrack, Sector As IMDSector, MaxSectors As Byte) As Boolean
+            Return IsMappableSector(Track, Sector, MaxSectors) AndAlso Not Sector.ChecksumError
+        End Function
+
+        Private Sub ProcessSectors(Track As IMDTrack)
+            Dim BitstreamSector As BitstreamSector
+            Dim SectorSize As UInteger
+            Dim IsStandard As Boolean
+            Dim Buffer() As Byte
+
+            For Each Sector In Track.Sectors
+                If IsMappableSector(Track, Sector, SECTOR_COUNT) Then
+                    IsStandard = IsStandardSector(Track, Sector, SECTOR_COUNT)
+                    BitstreamSector = GetSector(Track.Track, Track.Side, Sector.SectorId)
+                    If BitstreamSector Is Nothing Then
+                        SectorSize = Sector.Data.Length
+                        If SectorSize > 0 And SectorSize < 512 Then
+                            Buffer = New Byte(511) {}
+                            Array.Copy(Sector.Data, 0, Buffer, 0, SectorSize)
+                            BitstreamSector = New BitstreamSector(Buffer, Buffer.Length, False)
+                            SetSector(Track.Track, Track.Side, Sector.SectorId, BitstreamSector)
+                        ElseIf SectorSize = 512 Then
+                            BitstreamSector = New BitstreamSector(Sector.Data, Sector.Data.Length, IsStandard)
+                            SetSector(Track.Track, Track.Side, Sector.SectorId, BitstreamSector)
+                        End If
+                    Else
+                        BitstreamSector.IsStandard = False
                     End If
-                Next
-                HashAlgorithm.TransformFinalBlock(New Byte(0) {}, 0, 0)
-
-                Return HashBytesToString(HashAlgorithm.Hash)
-            End Function
-
-            Private Function GetEncoding(Mode As TrackMode) As BitstreamTrackType
-                If Mode = TrackMode.FM250kbps Or Mode = TrackMode.FM300kbps Or Mode = TrackMode.FM500kbps Then
-                    Return BitstreamTrackType.FM
-                ElseIf Mode = TrackMode.MFM250kbps Or Mode = TrackMode.MFM300kbps Or Mode = TrackMode.MFM500kbps Then
-                    Return BitstreamTrackType.MFM
-                Else
-                    Return BitstreamTrackType.Other
                 End If
-            End Function
+            Next
+        End Sub
 
-            Private Function IsStandardSector(Track As IMDTrack, Sector As IMDSector) As Boolean
-                If Sector.Unavailable Or Sector.Deleted Or Sector.ChecksumError Then
-                    Return False
+        Private Sub ProcessSectors1024(Track As IMDTrack)
+            Dim BitstreamSector As BitstreamSector
+            Dim NewSectorId As Integer
+            Dim Buffer() As Byte
+
+            For Each Sector In Track.Sectors
+                If IsMappableSector(Track, Sector, 4) And Sector.Data.Length = 1024 Then
+                    For i = 0 To 1
+                        NewSectorId = (Sector.SectorId - 1) * 2 + 1 + i
+                        BitstreamSector = GetSector(Track.Track, Track.Side, NewSectorId)
+                        If BitstreamSector Is Nothing Then
+                            Buffer = New Byte(511) {}
+                            Array.Copy(Sector.Data, Buffer.Length * i, Buffer, 0, Buffer.Length)
+                            BitstreamSector = New BitstreamSector(Buffer, Buffer.Length, False) With {
+                                .IsTranslated = True
+                            }
+                            SetSector(Track.Track, Track.Side, NewSectorId, BitstreamSector)
+                        Else
+                            BitstreamSector.IsStandard = False
+                        End If
+                    Next
                 End If
-
-                If Sector.Data.Length <> 512 Then
-                    Return False
-                End If
-
-                If Sector.Track <> Track.Track Or Sector.Side <> Track.Side Then
-                    Return False
-                End If
-
-                Return True
-            End Function
-        End Class
-    End Namespace
+            Next
+        End Sub
+    End Class
 End Namespace

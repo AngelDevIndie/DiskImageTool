@@ -1,16 +1,25 @@
 ﻿Public Class ImageData
+    Public Enum FileTypeEnum
+        Standard
+        Compressed
+        NewImage
+    End Enum
+
     Private ReadOnly _Filters() As Boolean
 
     Public Sub New(SourceFile As String)
         _AppliedFilters = 0
         _BatchUpdated = False
         _BottomIndex = -1
-        _Compressed = False
         _CompressedFile = ""
         _DiskType = ""
         _FATIndex = 0
+        _FileType = FileTypeEnum.Standard
         _SourceFile = SourceFile
         _Modifications = Nothing
+        _OldDisplayPath = ""
+        _NewFileName = ""
+        _FileNameChanged = False
         _OEMName = ""
         _ReadOnly = False
         _Scanned = False
@@ -31,19 +40,19 @@
     End Sub
 
     Public Property [ReadOnly] As Boolean
-    Public Property AppliedFilters As Integer
+    Public Property AppliedFilters As Long
     Public Property BatchUpdated As Boolean
     Public Property BottomIndex As Integer
-    Public Property CachedRootDir As Byte()
     Public Property Checksum As UInteger
-    Public Property Compressed As Boolean
     Public Property CompressedFile As String
     Public Property DiskType As String
     Public Property ExternalModified As Boolean
     Public Property FATIndex As UShort
+    Public Property FileType As FileTypeEnum
     Public Property InvalidImage As Boolean
     Public Property Loaded As Boolean
     Public Property Modifications As Stack(Of DiskImage.DataChange())
+    Public Property NewFileName As String
     Public Property OEMName As String
     Public Property Scanned As Boolean
     Public Property SortHistory As List(Of SortEntity)
@@ -52,6 +61,8 @@
     Public Property XDFLength As UInteger
     Public Property XDFMiniDisk As Boolean
     Public Property XDFOffset As UInteger
+    Public Property OldDisplayPath As String
+    Public Property FileNameChanged As Boolean
 
     Public Property Filter(FilterType As Filters.FilterTypes) As Boolean
         Get
@@ -65,25 +76,39 @@
 
     Public Function DisplayPath() As String
         Dim FullPath = _SourceFile
-        If _Compressed Then
+        If _FileType = FileTypeEnum.Compressed Then
             FullPath = IO.Path.Combine(FullPath, Replace(_CompressedFile, "/", "\"))
+        ElseIf _filetype = FileTypeEnum.NewImage Then
+            If _NewFileName = "" Then
+                FullPath = IO.Path.GetFileName(FullPath)
+            Else
+                FullPath = IO.Path.GetFileName(_NewFileName)
+            End If
         End If
-        Return FullPath
+            Return FullPath
     End Function
 
     Public Function FileName() As String
-        If _Compressed Then
+        If _FileType = FileTypeEnum.Compressed Then
             Return IO.Path.GetFileName(_CompressedFile)
+        ElseIf _filetype = FileTypeEnum.NewImage AndAlso _NewFileName <> "" Then
+            Return IO.Path.GetFileName(_NewFileName)
         Else
             Return IO.Path.GetFileName(_SourceFile)
         End If
     End Function
 
+    Public Function IsModified() As Boolean
+        Return Filter(Filters.FilterTypes.ModifiedFiles)
+    End Function
+
     Public Function GetSaveFile() As String
         Dim FilePath As String
 
-        If _Compressed Then
+        If _FileType = FileTypeEnum.Compressed Then
             FilePath = IO.Path.Combine(IO.Path.GetDirectoryName(_SourceFile), _CompressedFile)
+        ElseIf _filetype = FileTypeEnum.NewImage AndAlso _NewFileName <> "" Then
+            FilePath = _NewFileName
         Else
             FilePath = _SourceFile
         End If
@@ -98,7 +123,7 @@
     End Function
 
     Public Overrides Function ToString() As String
-        Return Right(DisplayPath, Len(DisplayPath) - _StringOffset).Replace("\", "  >  ") '& IIf(_Modified, " *", "")
+        Return Right(DisplayPath, Len(DisplayPath) - _StringOffset).Replace("\", "  >  ") '& If(_Modified, " *", "")
     End Function
 
 End Class

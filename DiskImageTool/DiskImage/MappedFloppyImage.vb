@@ -6,25 +6,28 @@ Namespace DiskImage
 
         Friend Const SECTOR_COUNT As Byte = 36
         Private ReadOnly _AdditionalTracks As HashSet(Of UShort)
-        Private ReadOnly _EmptySector() As Byte
+        Private ReadOnly _BytesPerSector As UInteger
         Private ReadOnly _Image As IBitstreamImage
         Private ReadOnly _NonStandardTracks As HashSet(Of UShort)
         Private ReadOnly _ProtectedSectors As HashSet(Of UInteger)
+        Private ReadOnly _TranslatedSectors As HashSet(Of UInteger)
         Private ReadOnly _History As ImageHistory
         Private _BPB As BiosParameterBlock
+        Private _EmptySector() As Byte
         Private _ImageSize As Integer
         Private _Sectors() As BitstreamSector
         Private _SideCount As Byte
         Private _TrackCount As UShort
         Private _Tracks() As TrackData
 
-        Public Sub New(Image As IBitstreamImage)
+        Public Sub New(Image As IBitstreamImage, BytesPerSector As UInteger)
             _Image = Image
             _History = New ImageHistory(Me)
             _ProtectedSectors = New HashSet(Of UInteger)
+            _TranslatedSectors = New HashSet(Of UInteger)
             _AdditionalTracks = New HashSet(Of UShort)
             _NonStandardTracks = New HashSet(Of UShort)
-            _EmptySector = New Byte(Disk.BYTES_PER_SECTOR - 1) {}
+            _BytesPerSector = BytesPerSector
 
             If _Image IsNot Nothing Then
                 BuildSectorMap()
@@ -40,6 +43,12 @@ Namespace DiskImage
         Public ReadOnly Property BitStreamImage As IBitstreamImage Implements IFloppyImage.BitstreamImage
             Get
                 Return _Image
+            End Get
+        End Property
+
+        Public ReadOnly Property BytesPerSector As UInteger Implements IFloppyImage.BytesPerSector
+            Get
+                Return _BytesPerSector
             End Get
         End Property
 
@@ -87,12 +96,6 @@ Namespace DiskImage
             End Get
         End Property
 
-        Public ReadOnly Property ProtectedSectors As HashSet(Of UInteger) Implements IFloppyImage.ProtectedSectors
-            Get
-                Return _ProtectedSectors
-            End Get
-        End Property
-
         Public ReadOnly Property Sectors As BitstreamSector()
             Get
                 Return _Sectors
@@ -104,6 +107,7 @@ Namespace DiskImage
                 Return _SideCount
             End Get
         End Property
+
         Public ReadOnly Property TrackCount As UShort Implements IFloppyImage.TrackCount
             Get
                 Return _TrackCount
@@ -204,11 +208,49 @@ Namespace DiskImage
             InitProtectedSectors()
         End Sub
 
+        ''' <summary>
+        ''' Rebuilds the decoded sector map and protected-sector sets from the current bitstream
+        ''' tracks. Call after editing track bitstreams (and re-decoding their MFMData) so the
+        ''' decoded model reflects the changes.
+        ''' </summary>
+        Public Sub RebuildSectorMap()
+            If _Image Is Nothing Then
+                Exit Sub
+            End If
+
+            BuildSectorMap()
+            InitProtectedSectors()
+        End Sub
+
+        Public Function IsProtectedSector(Sector As UInteger) As Boolean Implements IFloppyImage.IsProtectedSector
+            Return _ProtectedSectors.Contains(Sector)
+        End Function
+
+        Public Function IsTranslatedSector(Sector As UInteger) As Boolean Implements IFloppyImage.IsTranslatedSector
+            Return _TranslatedSectors.Contains(Sector)
+        End Function
+
         Public Function Resize(Length As Integer) As Boolean Implements IFloppyImage.Resize
             Return False
         End Function
 
-        Public Function SaveToFile(FilePath As String) As Boolean Implements IFloppyImage.SaveToFile
+        Public Function SetTrackBitstream(Track As UShort, Side As Byte, Bitstream As BitArray) As Boolean Implements IFloppyImage.SetTrackBitstream
+            If _Image Is Nothing Then
+                Return False
+            End If
+
+            Dim BitstreamTrack = _Image.GetTrack(CUShort(Track * _Image.TrackStep), Side)
+            If BitstreamTrack Is Nothing Then
+                Return False
+            End If
+
+            BitstreamTrack.Bitstream = Bitstream
+            BitstreamTrack.MFMData = New IBM_MFM.IBM_MFM_Track(Bitstream)
+
+            Return True
+        End Function
+
+        Public Overridable Function SaveToFile(FilePath As String) As Boolean Implements IFloppyImage.SaveToFile
             Return _Image.Export(FilePath)
         End Function
 
@@ -388,7 +430,7 @@ Namespace DiskImage
         Private Sub BuildSectorMap()
             Dim BitstreamTrack As IBitstreamTrack
 
-            Dim TrackCount = Math.Ceiling(_Image.TrackCount / _Image.TrackStep)
+            Dim TrackCount = CeilDiv(_Image.TrackCount, _Image.TrackStep)
 
             SetTracks(TrackCount, _Image.SideCount)
 
@@ -402,7 +444,11 @@ Namespace DiskImage
                         SetTrack(MappedTrack, Side, BitstreamTrack.MFMData, BitstreamTrack.TrackType)
 
                         If BitstreamTrack.MFMData IsNot Nothing Then
-                            ProcessMFMSectors(MappedTrack, Side, BitstreamTrack.MFMData.Sectors)
+                            If _BytesPerSector = 512 And BitstreamTrack.MFMData.FirstSectorId = 1 And BitstreamTrack.MFMData.LastSectorId = 4 And BitstreamTrack.MFMData.SectorSize = 1024 Then
+                                ProcessMFMSectors1024(Track, Side, BitstreamTrack.MFMData)
+                            Else
+                                ProcessMFMSectors(MappedTrack, Side, BitstreamTrack.MFMData)
+                            End If
                         End If
                     End If
                 Next
@@ -415,10 +461,12 @@ Namespace DiskImage
             Dim Head = SectorToHead(Sector)
             Dim SectorId = SectorToTrackSector(Sector) + 1
 
+            Dim SectorOffset = OffsetInSector(Offset)
+
             Dim MappedData As New MappedData With {
                 .Sector = Sector,
-                .Offset = SectorToOffset(Offset),
-                .Size = Disk.BYTES_PER_SECTOR,
+                .Offset = SectorOffset,
+                .Size = _BPB.BytesPerSector - SectorOffset,
                 .CanWrite = False
             }
 
@@ -429,8 +477,8 @@ Namespace DiskImage
                 If BitstreamSector Is Nothing Then
                     MappedData.Data = _EmptySector
                 Else
-                    If BitstreamSector.Size < MappedData.Size Then
-                        MappedData.Data = New Byte(MappedData.Size - 1) {}
+                    If BitstreamSector.Size < _BPB.BytesPerSector Then
+                        MappedData.Data = New Byte(_BPB.BytesPerSector - 1) {}
                         BitstreamSector.Data.CopyTo(MappedData.Data, 0)
                     Else
                         MappedData.Data = BitstreamSector.Data
@@ -447,8 +495,8 @@ Namespace DiskImage
             Dim BitstreamSector = GetSector(Track, Head, SectorId)
             If BitstreamSector Is Nothing Then
                 Return _EmptySector
-            ElseIf BitstreamSector.Size < Disk.BYTES_PER_SECTOR Then
-                Dim Data = New Byte(Disk.BYTES_PER_SECTOR - 1) {}
+            ElseIf BitstreamSector.Size < _BPB.BytesPerSector Then
+                Dim Data = New Byte(_BPB.BytesPerSector - 1) {}
                 BitstreamSector.Data.CopyTo(Data, 0)
                 Return Data
             Else
@@ -461,19 +509,24 @@ Namespace DiskImage
         End Function
 
         Private Sub InferFloppyDiskFormat(DiskFormat As FloppyDiskFormat)
-            _BPB = BuildBPB(DiskFormat)
-            _ImageSize = GetFloppyDiskSize(DiskFormat)
+            Dim BPBParams = FloppyDiskFormatGetParams(DiskFormat).BPBParams
+            _BPB = BPBParams.GetBPB
+            _ImageSize = BPBParams.SizeInBytes
+            _EmptySector = New Byte(_BPB.BytesPerSector - 1) {}
 
             Dim Data = GetSectorData(0, 0, 1)
-            Dim BPB = New BiosParameterBlock(Data)
+            Dim BPB As New BiosParameterBlock(Data)
 
             If BPB.IsValid Then
                 _BPB = BPB
-                _ImageSize = _BPB.SectorCount * Disk.BYTES_PER_SECTOR
+                _ImageSize = _BPB.SectorCount * _BPB.BytesPerSector
             Else
                 Data = GetSectorData(0, 0, 2)
-                Dim MediaDescriptor = Data(0)
-                Dim FATDiskFormat = GetFloppyDiskFomat(MediaDescriptor)
+                Dim MediaDescriptor As Byte = 0
+                If Data(1) = &HFF And Data(2) = &HFF Then
+                    MediaDescriptor = Data(0)
+                End If
+                Dim FATDiskFormat = FloppyDiskFormatGet(MediaDescriptor)
                 If FATDiskFormat <> FloppyDiskFormat.FloppyUnknown Then
                     If _SideCount = 1 Then
                         If FATDiskFormat = FloppyDiskFormat.Floppy360 Then
@@ -483,79 +536,122 @@ Namespace DiskImage
                         End If
                     End If
                     _BPB = BuildBPB(FATDiskFormat)
-                    _ImageSize = GetFloppyDiskSize(FATDiskFormat)
+                    _ImageSize = FloppyDiskFormatGetParams(FATDiskFormat).BPBParams.SizeInBytes
                 End If
             End If
         End Sub
 
-        Private Sub InitProtectedSectors()
+        Protected Sub InitProtectedSectors()
             _ProtectedSectors.Clear()
+            _TranslatedSectors.Clear()
             _NonStandardTracks.Clear()
+            _AdditionalTracks.Clear()
 
             Dim TrackCount = GetTrackCount()
 
-            For Cylinder = 0 To _TrackCount - 1
+            For Cylinder = 0 To Math.Max(_TrackCount, TrackCount) - 1
                 For Side = 0 To _SideCount - 1
-                    Dim TrackData = GetTrack(Cylinder, Side)
-                    Dim TrackIsStandard As Boolean = True
-                    If TrackData IsNot Nothing Then
-                        If TrackData.Encoding <> BitstreamTrackType.Other Then
+                    If Cylinder < TrackCount Then
+                        Dim TrackData = GetTrack(Cylinder, Side)
+                        Dim TrackIsStandard As Boolean = False
+                        If TrackData IsNot Nothing Then
                             If TrackData.Encoding = BitstreamTrackType.MFM Then
-                                If TrackData.FirstSector > -1 Then
-                                    TrackIsStandard = TrackData.FirstSector >= 1 And TrackData.LastSector <= Math.Max(_BPB.SectorsPerTrack, 9)
+                                If TrackData.FirstSectorId > -1 Then
+                                    TrackIsStandard = TrackData.FirstSectorId >= 1 And TrackData.LastSectorId <= Math.Max(_BPB.SectorsPerTrack, 9)
                                 End If
-
-                            ElseIf TrackData.Encoding = BitstreamTrackType.FM Then
-                                AdditionalTracks.Add(Cylinder * _SideCount + Side)
                             End If
 
                             For SectorId = 1 To _BPB.SectorsPerTrack
+                                Dim Sector = GetSectorFromParams(Cylinder, Side, SectorId)
                                 Dim BitstreamSector As BitstreamSector = Nothing
                                 If Cylinder < _TrackCount And Side < _SideCount Then
                                     BitstreamSector = GetSector(Cylinder, Side, SectorId)
                                 End If
                                 If BitstreamSector Is Nothing Then
-                                    If Cylinder < TrackCount Then
-                                        Dim Sector = GetSectorFromParams(Cylinder, Side, SectorId)
-                                        ProtectedSectors.Add(Sector)
+                                    _ProtectedSectors.Add(Sector)
+                                    TrackIsStandard = False
+                                Else
+                                    If Not BitstreamSector.IsStandard Then
+                                        _ProtectedSectors.Add(Sector)
                                         TrackIsStandard = False
                                     End If
-                                ElseIf Not BitstreamSector.IsStandard Then
-                                    Dim Sector = GetSectorFromParams(Cylinder, Side, SectorId)
-                                    ProtectedSectors.Add(Sector)
-                                    TrackIsStandard = False
+                                    If BitstreamSector.IsTranslated Then
+                                        _TranslatedSectors.Add(Sector)
+                                    End If
                                 End If
                             Next
-                            If Not TrackIsStandard Then
-                                _NonStandardTracks.Add(Cylinder * _SideCount + Side)
-                            End If
+                        Else
+                            For SectorId = 1 To _BPB.SectorsPerTrack
+                                Dim Sector = GetSectorFromParams(Cylinder, Side, SectorId)
+                                _ProtectedSectors.Add(Sector)
+                            Next
                         End If
+
+                        If Not TrackIsStandard Then
+                            _NonStandardTracks.Add(Cylinder * _SideCount + Side)
+                        End If
+                    Else
+                        _AdditionalTracks.Add(Cylinder * _SideCount + Side)
                     End If
                 Next
             Next
         End Sub
 
         Private Function OffsetToSector(Offset As UInteger) As UInteger
-            Return Offset \ Disk.BYTES_PER_SECTOR
+            Return Offset \ _BPB.BytesPerSector
         End Function
 
-        Private Sub ProcessMFMSectors(Track As UShort, Side As Byte, Sectors As List(Of IBM_MFM.IBM_MFM_Sector))
-            For Each MFMSector In Sectors
-                If MFMSector.DAMFound Then
-                    If MFMSector.SectorId >= 1 And MFMSector.SectorId <= SECTOR_COUNT Then
-                        Dim IsStandard = IBM_MFM.IsStandardSector(MFMSector, Track, Side)
-                        If IsStandard Then
-                            Dim BitstreamSector As New BitstreamSector(MFMSector) With {
-                               .IsStandard = IsStandard
-                            }
-                            Dim Sector = GetSector(Track, Side, MFMSector.SectorId)
-                            If Sector Is Nothing Then
-                                SetSector(Track, Side, MFMSector.SectorId, BitstreamSector)
-                            Else
-                                Sector.IsStandard = False
-                            End If
+        Private Sub ProcessMFMSectors(Track As UShort, Side As Byte, MFMData As IBM_MFM.IBM_MFM_Track)
+            Dim BitstreamSector As BitstreamSector
+            Dim Sector As BitstreamSector
+            Dim SectorSize As UInteger
+            Dim IsStandard As Boolean
+            Dim Buffer() As Byte
+
+            For Each MFMSector In MFMData.Sectors
+                If IBM_MFM.IsMappableSector(MFMSector, Track, Side, SECTOR_COUNT) Then
+                    IsStandard = IBM_MFM.IsStandardSector(MFMSector, Track, Side, SECTOR_COUNT)
+                    Sector = GetSector(Track, Side, MFMSector.SectorId)
+                    If Sector Is Nothing Then
+                        SectorSize = MFMSector.GetSizeBytes
+                        If SectorSize > 0 And SectorSize < _BytesPerSector Then
+                            Buffer = New Byte(_BytesPerSector - 1) {}
+                            Array.Copy(MFMSector.Data, 0, Buffer, 0, SectorSize)
+                            BitstreamSector = New BitstreamSector(Buffer, Buffer.Length, False)
+                            SetSector(Track, Side, MFMSector.SectorId, BitstreamSector)
+                        ElseIf SectorSize = _BytesPerSector Then
+                            BitstreamSector = New BitstreamSector(MFMSector, IsStandard)
+                            SetSector(Track, Side, MFMSector.SectorId, BitstreamSector)
                         End If
+                    Else
+                        Sector.IsStandard = False
                     End If
+                End If
+            Next
+        End Sub
+
+        Private Sub ProcessMFMSectors1024(Track As UShort, Side As Byte, MFMData As IBM_MFM.IBM_MFM_Track)
+            Dim BitstreamSector As BitstreamSector
+            Dim Sector As BitstreamSector
+            Dim NewSectorId As Integer
+            Dim Buffer() As Byte
+
+            For Each MFMSector In MFMData.Sectors
+                If IBM_MFM.IsMappableSector(MFMSector, Track, Side, 4) And MFMSector.GetSizeBytes = 1024 Then
+                    For i = 0 To 1
+                        NewSectorId = (MFMSector.SectorId - 1) * 2 + 1 + i
+                        Sector = GetSector(Track, Side, NewSectorId)
+                        If Sector Is Nothing Then
+                            Buffer = New Byte(511) {}
+                            Array.Copy(MFMSector.Data, Buffer.Length * i, Buffer, 0, Buffer.Length)
+                            BitstreamSector = New BitstreamSector(Buffer, Buffer.Length, False) With {
+                                .IsTranslated = True
+                            }
+                            SetSector(Track, Side, NewSectorId, BitstreamSector)
+                        Else
+                            Sector.IsStandard = False
+                        End If
+                    Next
                 End If
             Next
         End Sub
@@ -564,8 +660,8 @@ Namespace DiskImage
             Return Int(Sector / _BPB.SectorsPerTrack) Mod _BPB.NumberOfHeads
         End Function
 
-        Private Function SectorToOffset(Offset As UInteger) As UInteger
-            Return Offset Mod Disk.BYTES_PER_SECTOR
+        Private Function OffsetInSector(Offset As UInteger) As UInteger
+            Return Offset Mod _BPB.BytesPerSector
         End Function
 
         Private Function SectorToTrack(Sector As UInteger) As UShort
@@ -587,11 +683,12 @@ Namespace DiskImage
                 .Encoding = Encoding
             }
             If MFMData IsNot Nothing Then
-                TrackData.FirstSector = MFMData.FirstSector
-                TrackData.LastSector = MFMData.LastSector
+                TrackData.FirstSectorId = MFMData.FirstSectorId
+                TrackData.LastSectorId = MFMData.LastSectorId
                 TrackData.SectorSize = MFMData.SectorSize
                 TrackData.DuplicateSectors = MFMData.DuplicateSectors
                 TrackData.OverlappingSectors = MFMData.OverlappingSectors
+                TrackData.SectorCount = MFMData.Sectors.Count
             End If
 
             _Tracks(Index) = TrackData
@@ -600,17 +697,19 @@ Namespace DiskImage
         Public Class TrackData
             Public Sub New()
                 _DuplicateSectors = False
-                _FirstSector = -1
-                _LastSector = -1
+                _FirstSectorId = -1
+                _LastSectorId = -1
                 _OverlappingSectors = False
                 _Encoding = BitstreamTrackType.Other
+                _SectorCount = 0
             End Sub
 
             Public Property DuplicateSectors As Boolean
             Public Property Encoding As BitstreamTrackType
-            Public Property FirstSector As Integer
-            Public Property LastSector As Integer
+            Public Property FirstSectorId As Short
+            Public Property LastSectorId As Short
             Public Property OverlappingSectors As Boolean
+            Public Property SectorCount As Integer
             Public Property SectorSize As Integer
         End Class
 

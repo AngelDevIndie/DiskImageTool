@@ -1,207 +1,126 @@
-﻿Imports System.Collections.ObjectModel
-Imports System.ComponentModel
-Imports System.IO
-Imports System.IO.Compression
+﻿Imports System.Threading
 
 Public Class ImageLoadForm
-    Private Const MIN_FILE_SIZE As Long = 163840
-    Private Const MAX_FILE_SIZE As Long = 3000000
-    Private ReadOnly _Files() As String
-    Private ReadOnly _LoadedFileNames As Dictionary(Of String, ImageData)
-    Private ReadOnly _Parent As MainForm
-    Private _Activated As Boolean = False
+    Private WithEvents DelayTimer As Windows.Forms.Timer
+    Private Const DelayMs As Integer = 500
+    Private ReadOnly _CtSource As CancellationTokenSource
+    Private ReadOnly _Files As String()
+    Private ReadOnly _NewFileName As String
+    Private ReadOnly _NewImage As Boolean
+    Private ReadOnly _Scanner As ImageScanner
     Private _Counter As Integer = 0
-    Private _ImageCount As Integer = 0
     Private _EndScan As Boolean = False
-    Private _SelectedImageData As ImageData = Nothing
-    Private _Visible As Boolean = False
+    Private _ImageCount As Integer = 0
 
-    Public Sub New(Parent As MainForm, Files() As String, LoadedFileNames As Dictionary(Of String, ImageData))
-
-        ' This call is required by the designer.
+    Public Sub New(scanner As ImageScanner, Files() As String, NewImage As Boolean, NewFileName As String)
         InitializeComponent()
+        Me.Opacity = 0.0
 
-        ' Add any initialization after the InitializeComponent() call.
-        _Parent = Parent
+        Me.Text = My.Resources.Caption_ScanFiles
+        _Scanner = scanner
+        _CtSource = New Threading.CancellationTokenSource()
         _Files = Files
-        _LoadedFileNames = LoadedFileNames
+        _NewImage = NewImage
+        _NewFileName = NewFileName
+
+        AddHandler _Scanner.FileScanned, AddressOf Scanner_FileScanned
+        AddHandler _Scanner.ImageDiscovered, AddressOf Scanner_ImageDiscovered
+        AddHandler _Scanner.ScanCompleted, AddressOf Scanner_ScanCompleted
     End Sub
 
-    Public ReadOnly Property SelectedImageData As ImageData
+    Public ReadOnly Property EndScan As Boolean
         Get
-            Return _SelectedImageData
+            Return _EndScan
         End Get
     End Property
 
-    Private Shared Function IsZipArchive(FileName As String) As ZipArchive
-        Try
-            Dim Buffer(1) As Byte
-            Using fs = New FileStream(FileName, FileMode.Open, FileAccess.Read)
-                Dim BytesRead = fs.Read(Buffer, 0, Buffer.Length)
-                fs.Close()
-            End Using
-
-            If Buffer(0) = &H50 And Buffer(1) = &H4B Then
-                Return ZipFile.OpenRead(FileName)
-            End If
-        Catch ex As Exception
-            DebugException(ex)
-            Return Nothing
-        End Try
-
-        Return Nothing
-    End Function
-
-    Private Sub LoadedFileAdd(bw As BackgroundWorker, Key As String, FileName As String, Compressed As Boolean, Optional CompressedFile As String = "")
-
-        If Not _LoadedFileNames.ContainsKey(Key) Then
-            Dim ImageData = New ImageData(FileName)
-            If Compressed Then
-                ImageData.Compressed = True
-                ImageData.CompressedFile = CompressedFile
-            End If
-
-            _LoadedFileNames.Add(Key, ImageData)
-            If _SelectedImageData Is Nothing Then
-                _SelectedImageData = ImageData
-            End If
-            bw.ReportProgress(2, ImageData)
-        End If
+    Public Shared Sub Display(scanner As ImageScanner, Files() As String, NewImage As Boolean, NewFileName As String)
+        Using dlg As New ImageLoadForm(scanner, Files, NewImage, NewFileName)
+            dlg.ShowDialog(App.CurrentFormInstance)
+        End Using
     End Sub
 
-    Private Sub ProcessFile(bw As BackgroundWorker, FileName As String, Extension As String)
-        If Not File.Exists(FileName) Then
+    Protected Overrides Sub OnFormClosed(e As FormClosedEventArgs)
+        MyBase.OnFormClosed(e)
+
+        If DelayTimer IsNot Nothing Then
+            DelayTimer.Stop()
+            DelayTimer.Dispose()
+            DelayTimer = Nothing
+        End If
+
+        _CtSource.Cancel()
+        _CtSource.Dispose()
+    End Sub
+
+    Private Sub DelayTimer_Tick(sender As Object, e As EventArgs) Handles DelayTimer.Tick
+        DelayTimer.Stop()
+
+        ' If the scan already finished or the form is closing, do nothing
+        If _EndScan OrElse Me.IsDisposed OrElse Me.Disposing Then
             Return
         End If
 
-        Dim Archive = IsZipArchive(FileName)
-
-        If Archive IsNot Nothing Then
-            Dim Entries As ReadOnlyCollection(Of ZipArchiveEntry) = Nothing
-            Try
-                Entries = Archive.Entries
-            Catch
-                '
-            End Try
-            If Entries IsNot Nothing Then
-                For Each Entry In Entries.OrderBy(Function(e) e.FullName)
-                    Dim EntryFileExt = Path.GetExtension(Entry.Name).ToLower
-                    If AllFileExtensions.Contains(EntryFileExt) Then
-                        Dim FilePath = Path.Combine(FileName, Entry.FullName)
-                        Dim CheckLength = Not BitstreamFileExtensions.Contains(EntryFileExt) And Not AdvancedSectorFileExtensions.Contains(EntryFileExt)
-                        If Not CheckLength OrElse (Entry.Length >= MIN_FILE_SIZE And Entry.Length <= MAX_FILE_SIZE) Then
-                            LoadedFileAdd(bw, FilePath, FileName, True, Entry.FullName)
-                        End If
-                    End If
-                Next
-            End If
-        Else
-            If Not ArchiveFileExtensions.Contains(Extension) Then
-                Dim Length As Long = 0
-                Try
-                    Length = New FileInfo(FileName).Length
-                Catch
-                    '
-                End Try
-                Dim CheckLength = Not BitstreamFileExtensions.Contains(Extension) And Not AdvancedSectorFileExtensions.Contains(Extension)
-                If Not CheckLength OrElse (Length >= MIN_FILE_SIZE And Length <= MAX_FILE_SIZE) Then
-                    LoadedFileAdd(bw, FileName, FileName, False)
-                End If
-            End If
-        End If
-    End Sub
-
-    Private Function ProcessScan(bw As BackgroundWorker) As Boolean
-        If _Files.Count = 0 Then
-            Return True
-        End If
-
-        For Each FilePath In _Files.OrderBy(Function(f) f)
-            If bw.CancellationPending Then
-                Return True
-            End If
-            Dim FAttributes = IO.File.GetAttributes(FilePath)
-            If (FAttributes And IO.FileAttributes.Directory) > 0 Then
-                Dim DirectoryInfo As New IO.DirectoryInfo(FilePath)
-                Dim Files = DirectoryInfo.GetFiles("*.*", IO.SearchOption.AllDirectories)
-                For Each FileInfo In Files
-                    If bw.CancellationPending Then
-                        Return True
-                    End If
-                    Dim Extension = FileInfo.Extension.ToLower
-                    If AllFileExtensions.Contains(Extension) OrElse ArchiveFileExtensions.Contains(Extension) Then
-                        ProcessFile(bw, FileInfo.FullName, Extension)
-                    End If
-                    bw.ReportProgress(1)
-                Next
-            Else
-                Dim Extension = Path.GetExtension(FilePath).ToLower
-                ProcessFile(bw, FilePath, Extension)
-            End If
-            bw.ReportProgress(1)
-        Next
-
-        Return True
-    End Function
-
-#Region "Events"
-
-    Private Sub BackgroundWorker1_DoWork(sender As Object, e As DoWorkEventArgs) Handles BackgroundWorker1.DoWork
-        Dim bw As BackgroundWorker = CType(sender, BackgroundWorker)
-
-        If Not ProcessScan(bw) Then
-            e.Cancel = True
-        End If
-    End Sub
-
-    Private Sub BackgroundWorker1_ProgressChanged(sender As Object, e As ProgressChangedEventArgs) Handles BackgroundWorker1.ProgressChanged
-        If e.ProgressPercentage = 1 Then
-            _Counter += 1
-            If Not _Visible AndAlso _Counter > 10 Then
-                _Visible = True
-                Me.Opacity = 1
-            End If
-            If _Counter Mod 10 = 0 Then
-                LblScanning.Text = "Scanning... " & _Counter & " files"
-                lblScanning2.Text = _ImageCount & " images loaded"
-                LblScanning.Refresh()
-                lblScanning2.Refresh()
-            End If
-        ElseIf e.ProgressPercentage = 2 Then
-            _ImageCount += 1
-            Dim ImageData As ImageData = e.UserState
-            _Parent.ComboImages.Items.Add(ImageData)
-        End If
-    End Sub
-
-    Private Sub BackgroundWorker1_RunWorkerCompleted(sender As Object, e As RunWorkerCompletedEventArgs) Handles BackgroundWorker1.RunWorkerCompleted
-        _EndScan = True
-
-        Me.Hide()
-    End Sub
-
-    Private Sub ImageLoadForm_Activated(sender As Object, e As EventArgs) Handles Me.Activated
-        If Not _Activated Then
-            _EndScan = False
-            LblScanning.Text = "Scanning"
-            BackgroundWorker1.RunWorkerAsync()
-        End If
-        _Activated = True
+        ' Scan is still running → bring the dialog on-screen and show it
+        Me.Opacity = 1.0
     End Sub
 
     Private Sub ImageLoadForm_FormClosing(sender As Object, e As FormClosingEventArgs) Handles Me.FormClosing
         If Not _EndScan Then
+            ' Treat user close as cancel
             e.Cancel = True
-            If Not BackgroundWorker1.CancellationPending Then
-                BackgroundWorker1.CancelAsync()
-            End If
+            _CtSource.Cancel()
+        End If
+    End Sub
+    Private Sub ImageLoadForm_Load(sender As Object, e As EventArgs) Handles MyBase.Load
+        LblScanning.Text = My.Resources.Label_Scanning
+        lblScanning2.Text = String.Format(My.Resources.Label_ImagesLoaded, 0)
+
+        Task.Run(Sub() _Scanner.Scan(_Files, _NewImage, _NewFileName, _CtSource.Token))
+
+        DelayTimer = New Windows.Forms.Timer With {
+            .Interval = DelayMs
+        }
+        DelayTimer.Start()
+    End Sub
+
+    Private Sub Scanner_FileScanned(sender As Object, e As EventArgs)
+        If Me.InvokeRequired Then
+            Me.Invoke(New EventHandler(AddressOf Scanner_FileScanned), sender, e)
+            Return
+        End If
+
+        _Counter += 1
+
+        If _Counter Mod 10 = 0 Then
+            LblScanning.Text = My.Resources.Label_Scanning & "... " & _Counter & " " & My.Resources.Label_Files
+            lblScanning2.Text = String.Format(My.Resources.Label_ImagesLoaded, _ImageCount)
+            LblScanning.Refresh()
+            lblScanning2.Refresh()
         End If
     End Sub
 
-    Private Sub ImageLoadForm_Load(sender As Object, e As EventArgs) Handles Me.Load
-        Me.Opacity = 0.0
+    Private Sub Scanner_ImageDiscovered(sender As Object, e As ImageDiscoveredEventArgs)
+        If Me.InvokeRequired Then
+            Me.Invoke(New EventHandler(Of ImageDiscoveredEventArgs)(AddressOf Scanner_ImageDiscovered), sender, e)
+            Return
+        End If
+
+        _ImageCount += 1
+        lblScanning2.Text = String.Format(My.Resources.Label_ImagesLoaded, _ImageCount)
+        lblScanning2.Refresh()
     End Sub
 
-#End Region
+    Private Sub Scanner_ScanCompleted(sender As Object, e As ScanCompletedEventArgs)
+        If Me.InvokeRequired Then
+            Me.Invoke(New EventHandler(Of ScanCompletedEventArgs)(AddressOf Scanner_ScanCompleted), sender, e)
+            Return
+        End If
 
+        _EndScan = True
+
+        DelayTimer?.Stop()
+
+        Me.Close()
+    End Sub
 End Class

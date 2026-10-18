@@ -11,6 +11,7 @@
 
         ' This call is required by the designer.
         InitializeComponent()
+        LocalizeForm()
 
         ' Add any initialization after the InitializeComponent() call.
         LblCaption.Text = Caption
@@ -22,11 +23,36 @@
         RadioFill00.Enabled = CanFill
     End Sub
 
+    Private Sub LocalizeForm()
+        BtnCancel.Text = My.Resources.Menu_No
+        BtnOK.Text = My.Resources.Menu_Yes
+        GroupBox1.Text = My.Resources.Label_FillSectorsWith
+        RadioFillKeep.Text = My.Resources.Label_KeepData
+    End Sub
+
     Public ReadOnly Property Result As DeleteFileFormResult
         Get
             Return _Result
         End Get
     End Property
+
+    Public Shared Function Display(Caption As String, Title As String, CanFill As Boolean) As DeleteFileFormResult
+        If CanFill Then
+            Using dlg As New DeleteFileForm(Caption, Title, CanFill)
+                dlg.ShowDialog(App.CurrentFormInstance)
+                Return dlg.Result
+            End Using
+        Else
+            Dim MsgBoxResult = MsgBox(Caption, MsgBoxStyle.YesNo Or MsgBoxStyle.Question Or MsgBoxStyle.DefaultButton2, Title)
+            Dim Result As New DeleteFileFormResult With {
+                .Clear = False,
+                .FillChar = &H0,
+                .Cancelled = (MsgBoxResult = MsgBoxResult.No)
+            }
+
+            Return Result
+        End If
+    End Function
 
     Private Sub SetResult(Cancelled As Boolean)
         If RadioFillKeep.Checked Then

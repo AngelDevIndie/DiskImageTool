@@ -1,17 +1,15 @@
 ﻿Imports System.Runtime.InteropServices
 Imports DiskImageTool.HexView
-Imports Hb.Windows.Forms
+Imports DiskImageTool.Hb.Windows.Forms
 Imports DiskImageTool.Bitstream.IBM_MFM
 Imports DiskImageTool.DiskImage
 Imports DiskImageTool.Bitstream
 
-Public Class HexViewRawForm
-    Private WithEvents CheckBoxAllTracks As ToolStripCheckBox
-    Private WithEvents ComboSector As ToolStripComboBox
-    Private WithEvents ComboTrack As ToolStripComboBox
+Partial Public Class HexViewRawForm
+    Private WithEvents ComboTrack As ComboTrack
     Private WithEvents NumericBitOffset As ToolStripNumericUpDown
     Private _AllTracks As Boolean
-    Private _FloppyImage As IFloppyImage
+    Private _Bitstream As BitArray
     Private _CachedSelectedLength As Long = -1
     Private _CurrentRegionSector As BitstreamRegionSector = Nothing
     Private _CurrentSelectionLength As Long = -1
@@ -19,27 +17,39 @@ Public Class HexViewRawForm
     Private _CurrentTrackData As TrackData = Nothing
     Private _Data() As Byte
     Private _DataGridInspector As HexViewDataGridInspector
+    Private _FloppyImage As IFloppyImage
     Private _IgnoreEvent As Boolean = False
     Private _Initialized As Boolean = False
     Private _LabelBitOffset As ToolStripLabel
     Private _LabelBitOffsetAligned As ToolStripLabel
-    Private _LabelSector As ToolStripLabel
+    Private _LabelGap4A As ToolStripLabel
+    Private _LabelGap1 As ToolStripLabel
+    Private _labelEncoding As ToolStripLabel
     Private _LastSearch As HexSearch
-    Private _RegionData As RegionData
+    Private _RegionData As BitstreamRegionData
     Private _RegionMap() As BitstreamRegion
+    Private _SectorsPerTrack As UShort
     Private _Side As Byte
     Private _StoredCellValue As String
-    Private _TrackType As BitstreamTrackType
-    Private _Bitstream As BitArray
     Private _SurfaceData As BitArray
+    Private _TopSector As BitstreamRegionSector = Nothing
     Private _Track As UShort
+    Private _TrackType As BitstreamTrackType
     Private _WeakBitRegions As List(Of HighlightRange)
-    Public Sub New(FloppyImage As IFloppyImage, Track As UShort, Side As Byte, AllTracks As Boolean)
+    Private Const WM_CLIPBOARDUPDATE As Integer = &H31D
+
+    Public Sub New(Disk As Disk, Track As UShort, Side As Byte, AllTracks As Boolean)
         ' This call is required by the designer.
         InitializeComponent()
 
         ' Add any initialization after the InitializeComponent() call.
-        _FloppyImage = FloppyImage
+        LocalizeForm()
+        PopulateFillValues()
+
+        ToolStripEdit.Renderer = New FlatToolStripRenderer()
+
+        _FloppyImage = Disk.Image
+        _SectorsPerTrack = Disk.DiskParams.BPBParams.SectorsPerTrack
         _Track = Track
         _Side = Side
         _AllTracks = AllTracks
@@ -49,11 +59,91 @@ Public Class HexViewRawForm
         HexBox1.ReadOnly = True
         HexBox1.LineInfoOffset = 0
 
-        Me.Text = "Raw Track Data"
+        BtnCopyEncoded.Visible = App.Globals.AppSettings.Debug
+
+        Me.Text = My.Resources.Caption_RawTrackData
+
+        'If App.AppSettings.Debug Then
+        'AddContextMenuBitEditItems()
+        'End If
+    End Sub
+
+    Public Shared Function Display(Disk As Disk, Track As UShort, Side As Byte, AllTracks As Boolean) As Boolean
+        Using dlg As New HexViewRawForm(Disk, Track, Side, AllTracks)
+            dlg.ShowDialog(App.CurrentFormInstance)
+
+            Return dlg.TracksUpdated
+        End Using
+    End Function
+
+    Protected Overrides Sub WndProc(ByRef m As Message)
+        If m.Msg = WM_CLIPBOARDUPDATE Then
+            RefreshPasteButton()
+        End If
+
+        MyBase.WndProc(m)
+    End Sub
+
+    Private Sub LocalizeForm()
+        BtnAdjustOffset.Text = My.Resources.Menu_AdjustBitOffset
+        BtnCopyEncoded.Text = My.Resources.Menu_CopyEncoded
+        BtnCopyHex.Text = My.Resources.Menu_CopyHex
+        BtnCopyHexFormatted.Text = My.Resources.Menu_CopyHexFormatted
+        BtnCopyText.Text = My.Resources.Menu_CopyText
+        BtnCopyValue.Text = My.Resources.Menu_CopyValue
+        BtnDelete.Text = String.Format(My.Resources.Label_FillSelectionWith, "0x00")
+        BtnDeleteBytes.Text = My.Resources.Menu_DeleteSelectedBytes
+        BtnFill.Text = My.Resources.Label_FillSelection
+        BtnFill4E.Text = String.Format(My.Resources.Label_FillSelectionWith, "0x4E")
+        BtnFind.Text = My.Resources.Label_Find
+        BtnFindNext.Text = My.Resources.Label_FindNext
+        BtnInsertBytes.Text = My.Resources.Menu_InsertBytes
+        BtnNormalizeTrackSize.Text = My.Resources.Menu_NormalizeTrackSize
+        BtnPaste.Text = My.Resources.Menu_PasteOver
+        BtnRemoveSplice.Text = My.Resources.Menu_RemoveSplice
+        BtnRotateTrack.Text = My.Resources.Menu_RotateTrack
+        BtnSelectAll.Text = My.Resources.Menu_SelectAll
+        BtnSelectData.Text = My.Resources.Menu_SelectData
+        BtnSelectRegion.Text = My.Resources.Menu_SelectRegion
+        BtnSelectSector.Text = My.Resources.Menu_SelectSector
+        CheckBoxAllTracks.Text = My.Resources.Label_AllTracks
+        HexBox1.BuiltInContextMenu.CopyMenuItemText = WithoutHotkey(My.Resources.Menu_CopyText)
+        HexBox1.BuiltInContextMenu.SelectAllMenuItemText = My.Resources.Label_SelectAll
+        ToolStripBtnAdjustOffset.Text = WithoutHotkey(My.Resources.Menu_AdjustBitOffset)
+        ToolStripBtnCommit.Text = My.Resources.Label_Commit
+        ToolStripBtnCommit.ToolTipText = My.Resources.Label_CommitChanges
+        ToolStripBtnCopyHex.Text = WithoutHotkey(My.Resources.Menu_CopyHex)
+        ToolStripBtnCopyHexFormatted.Text = WithoutHotkey(My.Resources.Menu_CopyHexFormatted)
+        ToolStripBtnCopyText.Text = WithoutHotkey(My.Resources.Menu_CopyText)
+        ToolStripBtnDelete.Text = String.Format(My.Resources.Label_FillSelectionWith, "0x00")
+        ToolStripBtnFill4E.Text = String.Format(My.Resources.Label_FillSelectionWith, "0x4E")
+        ToolStripBtnFind.Text = My.Resources.Label_Find
+        ToolStripBtnFindNext.Text = My.Resources.Label_FindNext
+        ToolStripBtnPaste.Text = WithoutHotkey(My.Resources.Menu_PasteOver)
+        ToolStripBtnRedo.Text = WithoutHotkey(My.Resources.Menu_Redo)
+        ToolStripBtnSelectAll.Text = My.Resources.Label_SelectAll
+        ToolStripBtnSelectData.Text = My.Resources.Label_Data
+        ToolStripBtnSelectData.ToolTipText = WithoutHotkey(My.Resources.Menu_SelectData)
+        ToolStripBtnSelectRegion.Text = My.Resources.Label_Region
+        ToolStripBtnSelectRegion.ToolTipText = WithoutHotkey(My.Resources.Menu_SelectRegion)
+        ToolStripBtnSelectSector.Text = My.Resources.Label_Sector
+        ToolStripBtnSelectSector.ToolTipText = WithoutHotkey(My.Resources.Menu_SelectSector)
+        ToolStripBtnUndo.Text = WithoutHotkey(My.Resources.Menu_Undo)
+        ToolStripStatusChecksumText.Text = My.Resources.Label_Checksum & ":"
+        ToolStripToolsDeleteBytes.Text = My.Resources.Menu_DeleteSelectedBytes
+        ToolStripToolsInsertBytes.Text = My.Resources.Menu_InsertBytes
+        ToolStripToolsNormalizeTrackSize.Text = My.Resources.Menu_NormalizeTrackSize
+        ToolStripToolsNormalizeAllTrackSizes.Text = My.Resources.Menu_NormalizeAllTrackSizes
+        ToolStripToolsRemoveSplice.Text = My.Resources.Menu_RemoveSplice
+        ToolStripToolsRotateTrack.Text = My.Resources.Menu_RotateTrack
     End Sub
 
     <DllImport("user32.dll", SetLastError:=True)>
     Private Shared Function AddClipboardFormatListener(hwnd As IntPtr) As Boolean
+    End Function
+
+    <DllImport("user32.dll", SetLastError:=True)>
+    Private Shared Function RemoveClipboardFormatListener(hwnd As IntPtr) As Boolean
     End Function
     Private Sub ChangeOffset(Offset As UInteger)
         If _CurrentTrackData IsNot Nothing AndAlso _CurrentTrackData.Offset <> Offset Then
@@ -61,14 +151,6 @@ Public Class HexViewRawForm
 
             LoadTrack(_CurrentTrackData, True, True)
         End If
-    End Sub
-
-    Private Sub CopyHexToClipboard()
-        HexBox1.CopyHex()
-    End Sub
-
-    Private Sub CopyTextToClipboard()
-        HexBox1.Copy()
     End Sub
 
     Private Sub DataInspectorRefresh(ForceUpdate As Boolean)
@@ -130,7 +212,7 @@ Public Class HexViewRawForm
 
         If DataGridDataInspector.SelectedRows.Count > 0 Then
             Dim Row = DataGridDataInspector.SelectedRows.Item(0)
-            Dim Invalid As Boolean = Row.Cells.Item("DataGridInvalid").Value
+            Dim Invalid As Boolean = Row.Cells.Item(HexViewDataGridInspector.COLUMN_INVALID).Value
             If Not Invalid Then
                 Enabled = True
             End If
@@ -139,111 +221,69 @@ Public Class HexViewRawForm
         BtnCopyValue.Enabled = Enabled
     End Sub
 
-    Private Function GetRegionColor(RegionType As MFMRegionType) As Color
-        Select Case RegionType
-            Case MFMRegionType.Gap1, MFMRegionType.Gap2, MFMRegionType.Gap3, MFMRegionType.Gap4A, MFMRegionType.Gap4B
-                Return Color.Green
-            Case MFMRegionType.IAMNulls, MFMRegionType.IDAMNulls, MFMRegionType.DAMNulls
-                Return Color.Gray
-            Case MFMRegionType.IAMSync, MFMRegionType.IDAMSync, MFMRegionType.DAMSync
-                Return Color.MediumBlue
-            Case MFMRegionType.IAM, MFMRegionType.IDAM, MFMRegionType.DAM
-                Return Color.Blue
-            Case MFMRegionType.IDArea
-                Return Color.DarkOrange
-            Case MFMRegionType.IDAMChecksumValid, MFMRegionType.DataChecksumValid
-                Return Color.Purple
-            Case MFMRegionType.IDAMChecksumInvalid, MFMRegionType.DataChecksumInvalid
-                Return Color.Red
-            Case MFMRegionType.DataArea
-                Return Color.Black
-            Case MFMRegionType.Overflow
-                Return Color.Gray
-            Case Else
-                Return Color.Black
-        End Select
-    End Function
-
-    Private Function GetRegionDescription(Region As BitstreamRegion) As String
-        Select Case Region.RegionType
-            Case MFMRegionType.Gap1
-                Return "GAP 1" & "  (" & Region.Length & ")"
-            Case MFMRegionType.Gap2
-                Return "GAP 2" & "  (" & Region.Length & ")"
-            Case MFMRegionType.Gap3
-                Return "GAP 3" & "  (" & Region.Length & ")"
-            Case MFMRegionType.Gap4A
-                Return "GAP 4A" & "  (" & Region.Length & ")"
-            Case MFMRegionType.Gap4B
-                Return "GAP 3+4B" & "  (" & Region.Length & ")"
-            Case MFMRegionType.IAMNulls, MFMRegionType.IAMSync
-                Return "Index Field Sync"
-            Case MFMRegionType.IAM
-                Return "Index Address Mark"
-            Case MFMRegionType.IDAMNulls, MFMRegionType.IDAMSync
-                Return "ID Field Sync"
-            Case MFMRegionType.IDAM
-                Return "ID Address Mark"
-            Case MFMRegionType.IDArea
-                Return "ID Area"
-            Case MFMRegionType.IDAMChecksumValid, MFMRegionType.IDAMChecksumInvalid
-                Return "ID Area Checksum"
-            Case MFMRegionType.DAMNulls, MFMRegionType.DAMSync
-                Return "Data Field Sync"
-            Case MFMRegionType.DAM
-                Return "Data Address Mark"
-            Case MFMRegionType.DataArea
-                Return "Data Area" & "  (" & Region.Length & ")"
-            Case MFMRegionType.DataChecksumValid, MFMRegionType.DataChecksumInvalid
-                Return "Data Checksum"
-            Case MFMRegionType.Overflow
-                Return "Overflow"
-            Case Else
-                Return ""
-        End Select
-    End Function
-
-    Private Function GetWeakBitRegions(Bitstream As BitArray, Offset As UInteger) As List(Of HighlightRange)
-        If _SurfaceData Is Nothing Then
-            Return Nothing
+    Private Sub ApplyInspectorByteHighlight()
+        If Not DataGridDataInspector.ContainsFocus Then
+            Exit Sub
         End If
 
-        Dim RangeList As New List(Of HighlightRange)
-        Dim Range As HighlightRange = Nothing
+        If DataGridDataInspector.SelectedRows.Count = 0 Then
+            Exit Sub
+        End If
 
+        Dim Row = DataGridDataInspector.SelectedRows.Item(0)
+        Dim Editable As Boolean = Row.Cells.Item(HexViewDataGridInspector.COLUMN_EDITABLE).Value
+        Dim Length As Integer = Row.Cells.Item(HexViewDataGridInspector.COLUMN_LENGTH).Value
 
-        Dim BitValue As Boolean
-        Dim NumBytes As UInteger = Bitstream.Length \ 16
-        Dim HasWeakBit As Boolean
+        If Not Editable OrElse Row.ReadOnly OrElse Length <= 0 Then
+            RestoreInspectorByteHighlight()
+            Exit Sub
+        End If
 
-        Dim BitIndex = Offset
-        For i = 0 To NumBytes - 1
-            HasWeakBit = False
-            For j = 0 To 15
-                BitValue = _SurfaceData(BitIndex)
-                If BitValue Then
-                    HasWeakBit = True
-                End If
-                BitIndex += 1
-                If BitIndex > _SurfaceData.Length - 1 Then
-                    BitIndex = 0
-                End If
-            Next
-            If HasWeakBit Then
-                If Range Is Nothing Then
-                    Range = New HighlightRange(i)
-                    RangeList.Add(Range)
-                ElseIf i > Range.EndIndex + 1 Then
-                    Range = New HighlightRange(i)
-                    RangeList.Add(Range)
-                Else
-                    Range.EndIndex = i
-                End If
+        If _CachedSelectedLength = -1 Then
+            _CachedSelectedLength = HexBox1.SelectionLength
+        End If
+
+        HexBox1.SelectionLength = Length
+    End Sub
+
+    Private Sub RestoreInspectorByteHighlight()
+        If _CachedSelectedLength = -1 Then
+            Exit Sub
+        End If
+
+        Dim CachedLength = _CachedSelectedLength
+        _CachedSelectedLength = -1
+        HexBox1.SelectionLength = CachedLength
+    End Sub
+
+    Public Sub CopyHexEncoded(HexBox As HexBox, Formatted As Boolean)
+        Dim Bitstream = BitstreamAlign(_Bitstream, _CurrentTrackData.Offset)
+        Dim Data = BitsToBytes(_Bitstream, 0)
+
+        Dim StartIndex = HexBox.SelectionStart * 2
+        Dim Length = HexBox.SelectionLength * 2
+
+        If StartIndex + Length > Data.Length Then
+            Length = Data.Length - StartIndex
+        End If
+
+        Dim Capacity As Integer = Length * 2 + Length
+        If Formatted Then
+            Capacity += Length \ 16
+        End If
+
+        Dim SB As New System.Text.StringBuilder(Capacity)
+        For Counter = 0 To Length - 1
+            Dim B = Data(StartIndex + Counter)
+            SB.Append(B.ToString("X2"))
+            If Formatted AndAlso (Counter + 1) Mod 16 = 0 Then
+                SB.Append(vbNewLine)
+            Else
+                SB.Append(" ")
             End If
         Next
-
-        Return RangeList
-    End Function
+        Clipboard.SetText(SB.ToString)
+    End Sub
 
     Private Function GetBits(BitArray As BitArray, Offset As UInteger, CheckSync As Boolean) As String
         If BitArray Is Nothing Then
@@ -310,6 +350,125 @@ Public Class HexViewRawForm
 
         Return Value
     End Function
+
+    Private Function GetRegionColor(RegionType As MFMRegionType) As Color
+        Select Case RegionType
+            Case MFMRegionType.Gap1, MFMRegionType.Gap2, MFMRegionType.Gap3, MFMRegionType.Gap4A, MFMRegionType.Gap4B
+                Return Color.Green
+            Case MFMRegionType.IAMNulls, MFMRegionType.IDAMNulls, MFMRegionType.DAMNulls
+                Return Color.Gray
+            Case MFMRegionType.IAMSync, MFMRegionType.IDAMSync, MFMRegionType.DAMSync
+                Return Color.MediumBlue
+            Case MFMRegionType.IAM, MFMRegionType.IDAM, MFMRegionType.DAM
+                Return Color.Blue
+            Case MFMRegionType.IDArea, MFMRegionType.IDAreaCylinder, MFMRegionType.IDAreaHead, MFMRegionType.IDAreaSectorId, MFMRegionType.IDAreaSizeId
+                Return Color.DarkOrange
+            Case MFMRegionType.IDAMChecksumValid, MFMRegionType.DataChecksumValid
+                Return Color.Purple
+            Case MFMRegionType.IDAMChecksumInvalid, MFMRegionType.DataChecksumInvalid
+                Return Color.Red
+            Case MFMRegionType.DataArea
+                Return Color.Black
+            Case MFMRegionType.Overflow
+                Return Color.Gray
+            Case Else
+                Return Color.Black
+        End Select
+    End Function
+    Private Function GetRegionDescription(Region As BitstreamRegion) As String
+        Select Case Region.RegionType
+            Case MFMRegionType.Gap1
+                Return My.Resources.Bitstream_Gap & " 1" & "  " & InParens(Region.Length)
+            Case MFMRegionType.Gap2
+                Return My.Resources.Bitstream_Gap & " 2" & "  " & InParens(Region.Length)
+            Case MFMRegionType.Gap3
+                Return My.Resources.Bitstream_Gap & " 3" & "  " & InParens(Region.Length)
+            Case MFMRegionType.Gap4A
+                Return My.Resources.Bitstream_Gap & " 4A" & "  " & InParens(Region.Length)
+            Case MFMRegionType.Gap4B
+                Return My.Resources.Bitstream_Gap & " 3+4B" & "  " & InParens(Region.Length)
+            Case MFMRegionType.IAMNulls
+                Return My.Resources.Bitstream_IAMSync & "  " & InParens(Region.Length)
+            Case MFMRegionType.IAMSync
+                Return My.Resources.Bitstream_IAMSync
+            Case MFMRegionType.IAM
+                Return My.Resources.Bitstream_IAM
+            Case MFMRegionType.IDAMNulls
+                Return My.Resources.Bitstream_IDAMSync & "  " & InParens(Region.Length)
+            Case MFMRegionType.IDAMSync
+                Return My.Resources.Bitstream_IDAMSync
+            Case MFMRegionType.IDAM
+                Return My.Resources.Bitstream_IDAM
+            Case MFMRegionType.IDArea
+                Return My.Resources.Bitstream_IDArea
+            Case MFMRegionType.IDAreaCylinder
+                Return My.Resources.Bitstream_IDArea & " - " & My.Resources.Label_Track
+            Case MFMRegionType.IDAreaHead
+                Return My.Resources.Bitstream_IDArea & " - " & My.Resources.Label_Side
+            Case MFMRegionType.IDAreaSectorId
+                Return My.Resources.Bitstream_IDArea & " - " & My.Resources.Label_SectorId
+            Case MFMRegionType.IDAreaSizeId
+                Return My.Resources.Bitstream_IDArea & " - " & My.Resources.Label_SizeId
+            Case MFMRegionType.IDAMChecksumValid, MFMRegionType.IDAMChecksumInvalid
+                Return My.Resources.Bitstream_IDAMChecksum
+            Case MFMRegionType.DAMNulls
+                Return My.Resources.Bitstream_DAMSync & "  " & InParens(Region.Length)
+            Case MFMRegionType.DAMSync
+                Return My.Resources.Bitstream_DAMSync
+            Case MFMRegionType.DAM
+                Return My.Resources.Bitstream_DAM
+            Case MFMRegionType.DataArea
+                Return My.Resources.Label_DataArea & "  " & InParens(Region.Length)
+            Case MFMRegionType.DataChecksumValid, MFMRegionType.DataChecksumInvalid
+                Return My.Resources.Bitstream_DataChecksum
+            Case MFMRegionType.Overflow
+                Return My.Resources.Bitstream_Overflow
+            Case Else
+                Return ""
+        End Select
+    End Function
+
+    Private Function GetWeakBitRegions(Bitstream As BitArray, Offset As UInteger) As List(Of HighlightRange)
+        If _SurfaceData Is Nothing Then
+            Return Nothing
+        End If
+
+        Dim RangeList As New List(Of HighlightRange)
+        Dim Range As HighlightRange = Nothing
+
+
+        Dim BitValue As Boolean
+        Dim NumBytes As UInteger = Bitstream.Length \ 16
+        Dim HasWeakBit As Boolean
+
+        Dim BitIndex = Offset
+        For i = 0 To NumBytes - 1
+            HasWeakBit = False
+            For j = 0 To 15
+                BitValue = _SurfaceData(BitIndex)
+                If BitValue Then
+                    HasWeakBit = True
+                End If
+                BitIndex += 1
+                If BitIndex > _SurfaceData.Length - 1 Then
+                    BitIndex = 0
+                End If
+            Next
+            If HasWeakBit Then
+                If Range Is Nothing Then
+                    Range = New HighlightRange(i)
+                    RangeList.Add(Range)
+                ElseIf i > Range.EndIndex + 1 Then
+                    Range = New HighlightRange(i)
+                    RangeList.Add(Range)
+                Else
+                    Range.EndIndex = i
+                End If
+            End If
+        Next
+
+        Return RangeList
+    End Function
     Private Sub HexBoxHighlight(start As Long, size As Long, ForeColor As Color, BackColor As Color)
         HexBox1.HighlightForeColor = ForeColor
         HexBox1.HighlightBackColor = BackColor
@@ -320,6 +479,7 @@ Public Class HexViewRawForm
         AddClipboardFormatListener(Me.Handle)
 
         _DataGridInspector = New HexViewDataGridInspector(DataGridDataInspector)
+        _DataGridInspector.SetDataRow(DataRowEnum.Area, Nothing, True, True)
         _DataGridInspector.SetDataRow(DataRowEnum.File, Nothing, True, True)
         _DataGridInspector.SetDataRow(DataRowEnum.Description, Nothing, True, True)
 
@@ -331,12 +491,14 @@ Public Class HexViewRawForm
             ShowAllTracks = False
         End If
 
-        InitializeTrackNavigator()
+        CheckBoxAllTracks.Visible = ShowAllTracks
         If ShowAllTracks Then
-            InitializeAllTracksCheckBox()
+            CheckBoxAllTracks.Checked = _AllTracks
         End If
-        InitializeSectorNavigator()
+
+        InitializeTrackNavigator()
         InitializeBitOffsetNavigator()
+        InitializeToolstripLabels()
         PopulateTracks(_AllTracks)
     End Sub
     Private Sub HighlightRegions()
@@ -409,16 +571,6 @@ Public Class HexViewRawForm
             End If
         Next
     End Sub
-    Private Sub InitializeAllTracksCheckBox()
-        CheckBoxAllTracks = New ToolStripCheckBox With {
-            .Alignment = ToolStripItemAlignment.Right,
-            .Checked = _AllTracks,
-            .Margin = New Padding(12, 3, 0, 2),
-            .Text = "All Tracks"
-        }
-
-        ToolStripMain.Items.Add(CheckBoxAllTracks)
-    End Sub
 
     Private Sub InitializeBitOffsetNavigator()
         NumericBitOffset = New ToolStripNumericUpDown() With {
@@ -429,15 +581,15 @@ Public Class HexViewRawForm
             .Maximum = 15
         }
 
-        _LabelBitOffsetAligned = New ToolStripLabel("Aligned") With {
+        _LabelBitOffsetAligned = New ToolStripLabel(My.Resources.Label_ByteAligned) With {
             .Alignment = ToolStripItemAlignment.Right,
             .AutoSize = True,
-            .Padding = New Padding(0, 0, 36, 0),
+            .Padding = New Padding(0, 0, 8, 0),
             .ForeColor = Color.Green,
             .TextAlign = ContentAlignment.MiddleLeft
         }
 
-        _LabelBitOffset = New ToolStripLabel("Bit Offset") With {
+        _LabelBitOffset = New ToolStripLabel(My.Resources.Label_BitOffset) With {
             .Alignment = ToolStripItemAlignment.Right,
             .Padding = New Padding(12, 0, 0, 0)
         }
@@ -451,35 +603,31 @@ Public Class HexViewRawForm
         ToolStripMain.Items.Add(_LabelBitOffset)
     End Sub
 
-    Private Sub InitializeSectorNavigator()
-        ComboSector = New ToolStripComboBox() With {
-            .Alignment = ToolStripItemAlignment.Right,
-            .DropDownStyle = ComboBoxStyle.DropDownList,
-            .AutoSize = False,
-            .FlatStyle = FlatStyle.Standard,
-            .Size = New Drawing.Size(50, 23)
-        }
-        '.Size = New Drawing.Size(65, 23)
-
-        _LabelSector = New ToolStripLabel("Sector") With {
-            .Alignment = ToolStripItemAlignment.Right,
-            .Padding = New Padding(12, 0, 0, 0)
+    Private Sub InitializeToolstripLabels()
+        _labelEncoding = New ToolStripLabel("") With {
+           .Alignment = ToolStripItemAlignment.Right,
+           .Padding = New Padding(10, 0, 0, 0)
         }
 
-        ToolStripMain.Items.Add(ComboSector)
-        ToolStripMain.Items.Add(_LabelSector)
+        _LabelGap4A = New ToolStripLabel(FormatLabelPair(My.Resources.Label_Gap & " 4A", 0)) With {
+           .Alignment = ToolStripItemAlignment.Right,
+           .Padding = New Padding(10, 0, 0, 0)
+        }
+
+        _LabelGap1 = New ToolStripLabel(FormatLabelPair(My.Resources.Label_Gap & " 1", 0)) With {
+           .Alignment = ToolStripItemAlignment.Right,
+           .Padding = New Padding(10, 0, 0, 0)
+        }
+
+        ToolStripMain.Items.Add(_LabelGap1)
+        ToolStripMain.Items.Add(_LabelGap4A)
+        ToolStripMain.Items.Add(_labelEncoding)
     End Sub
 
     Private Sub InitializeTrackNavigator()
-        ComboTrack = New ToolStripComboBox() With {
-            .Alignment = ToolStripItemAlignment.Right,
-            .DropDownStyle = ComboBoxStyle.DropDownList,
-            .AutoSize = False,
-            .FlatStyle = FlatStyle.Standard,
-            .Size = New Drawing.Size(50, 23)
-        }
+        ComboTrack = New ComboTrack()
 
-        Dim LabelTrack = New ToolStripLabel("Track") With {
+        Dim LabelTrack As New ToolStripLabel(My.Resources.Label_Track) With {
             .Alignment = ToolStripItemAlignment.Right,
             .Padding = New Padding(6, 0, 0, 0)
         }
@@ -507,23 +655,15 @@ Public Class HexViewRawForm
             Next
         Next
 
-        ComboSector.ComboBox.Items.Clear()
-
-        For Each Sector In _RegionData.Sectors
-            ComboSector.ComboBox.Items.Add(Sector)
-        Next
+        _TopSector = Nothing
 
         If _RegionData.Sectors.Count = 0 Then
-            ComboSector.Visible = False
-            _LabelSector.Visible = False
             NumericBitOffset.Visible = False
             _LabelBitOffset.Visible = False
             _LabelBitOffsetAligned.Visible = False
             ToolStripBtnAdjustOffset.Visible = False
         Else
             Dim Aligned = _RegionData.Aligned And _RegionData.NumBits Mod 16 = 0
-            ComboSector.Visible = True
-            _LabelSector.Visible = True
             NumericBitOffset.Visible = Not Aligned
             NumericBitOffset.Enabled = Not OffsetsMatch
             _LabelBitOffset.Visible = True
@@ -536,7 +676,7 @@ Public Class HexViewRawForm
 
         If Sector IsNot Nothing Then
             Dim Offset = Sector.StartIndex
-            Dim MaxLineCount = Math.Ceiling(HexBox1.ByteProvider.Length / HexBox1.BytesPerLine)
+            Dim MaxLineCount = CeilDiv(CULng(HexBox1.ByteProvider.Length), CULng(HexBox1.BytesPerLine))
             Dim Line = Offset \ HexBox1.BytesPerLine
             If MaxLineCount - Line < HexBox1.VerticalByteCount Then
                 Line -= HexBox1.VerticalByteCount - (MaxLineCount - Line)
@@ -548,7 +688,7 @@ Public Class HexViewRawForm
         _IgnoreEvent = False
     End Sub
 
-    Private Sub LoadData(Data() As Byte, RegionData As RegionData, KeepGridLocation As Boolean)
+    Private Sub LoadData(Data() As Byte, RegionData As BitstreamRegionData, KeepGridLocation As Boolean)
         _Initialized = False
         _Data = Data
         _RegionData = RegionData
@@ -559,17 +699,33 @@ Public Class HexViewRawForm
         Dim SelectionLength = HexBox1.SelectionLength
 
         HexBox1.ByteProvider = Nothing
-        HexBox1.ByteProvider = New DynamicByteProvider(Data)
+        HexBox1.ByteProvider = New SharedByteProvider(Data)
 
         If KeepGridLocation Then
             HexBox1.PerformScrollToLine(StartLine)
             HexBox1.Select(SelectionStart, SelectionLength)
         End If
 
-        ToolStripStatusBits.Text = Format(RegionData.NumBits, "N0") & " bits"
-        ToolStripStatusBytes.Text = Format(Math.Ceiling(RegionData.NumBits / 16), "N0") & " bytes"
+        Dim ExactBitCount = InferBitCount(RegionData.NumBits)
+        If RegionData.NumBits = ExactBitCount Then
+            ToolStripStatusExactBitCount.Text = "  ✓"
+        Else
+            ToolStripStatusExactBitCount.Text = ""
+        End If
+
+        ToolStripStatusBits.Text = FormatThousands(RegionData.NumBits) & " " & My.Resources.Label_Bits
+        ToolStripStatusBytes.Text = FormatThousands(CeilDiv(RegionData.NumBits, 16)) & " " & My.Resources.Label_Bytes
+
         _LastSearch = New HexSearch
 
+        _LabelGap4A.Text = FormatLabelPair(My.Resources.Label_Gap & " 4A", RegionData.Gap4A)
+        _LabelGap1.Text = FormatLabelPair(My.Resources.Label_Gap & " 1", RegionData.Gap1)
+        _labelEncoding.Text = FormatLabelPair(My.Resources.Label_Encoding, RegionData.Encoding)
+        _labelEncoding.Visible = RegionData.Encoding.Length > 0
+        _LabelGap4A.Visible = RegionData.Encoding = "MFM"
+        _LabelGap1.Visible = RegionData.Encoding = "MFM"
+
+        PanelSectors.Items = BuildSectorCells()
         InitRegionMap()
         HighlightRegions()
         RefreshSelection(True)
@@ -584,7 +740,9 @@ Public Class HexViewRawForm
             Exit Sub
         End If
 
-        Me.Text = "Raw Track Data - Track " & TrackData.Track & "." & TrackData.Side
+        PersistCurrentTrackOffset()
+
+        Me.Text = My.Resources.Caption_RawTrackData & " - " & FormatTrackSide(My.Resources.Label_Track, TrackData.Track, TrackData.Side)
 
         _CurrentTrackData = TrackData
 
@@ -593,38 +751,88 @@ Public Class HexViewRawForm
 
         Dim MFMTrack = _FloppyImage.BitstreamImage.GetTrack(TrackData.Track * _FloppyImage.BitstreamImage.TrackStep, TrackData.Side)
 
-        Dim Data() As Byte
-        Dim RegionData As RegionData
         _TrackType = MFMTrack.TrackType
         If MFMTrack.TrackType = BitstreamTrackType.MFM Or MFMTrack.TrackType = BitstreamTrackType.FM Then
+            Dim Cached = GetOrCreateCachedTrack(TrackData.Track, TrackData.Side, MFMTrack)
+            _Bitstream = Cached.Bitstream
+
             If TrackData.Offset = -1 Then
-                If MFMTrack.TrackType = BitstreamTrackType.MFM Then
-                    TrackData.Offset = MFMGetOffset(MFMTrack.Bitstream)
+                If Cached.Offset >= 0 Then
+                    TrackData.Offset = Cached.Offset
+                ElseIf MFMTrack.TrackType = BitstreamTrackType.MFM Then
+                    TrackData.Offset = MFMGetOffset(_Bitstream)
+                    Cached.Offset = TrackData.Offset
                 Else
-                    TrackData.Offset = FMGetOffset(MFMTrack.Bitstream)
+                    TrackData.Offset = FMGetOffset(_Bitstream)
+                    Cached.Offset = TrackData.Offset
                 End If
+            Else
+                Cached.Offset = TrackData.Offset
             End If
-            Dim NumBytes = MFMTrack.Bitstream.Length \ 16
-            RegionData = MFMGetRegionList(MFMTrack.Bitstream, MFMTrack.TrackType)
-            Data = MFMGetBytes(MFMTrack.Bitstream, TrackData.Offset, RegionData.NumBytes)
+
             _IgnoreEvent = True
             NumericBitOffset.Value = TrackData.Offset
             _IgnoreEvent = False
-            _Bitstream = MFMTrack.Bitstream
             _SurfaceData = MFMTrack.SurfaceData
-            _WeakBitRegions = GetWeakBitRegions(MFMTrack.Bitstream, TrackData.Offset)
+
+            ReloadFromWorkingBitstream(KeepGridLocation)
         Else
-            Data = BitsToBytes(MFMTrack.Bitstream, 0)
-            RegionData.NumBits = MFMTrack.Bitstream.Length
-            RegionData.Regions = New List(Of BitstreamRegion)
-            RegionData.Sectors = New List(Of BitstreamRegionSector)
+            Dim Data = BitsToBytes(MFMTrack.Bitstream, 0)
+            Dim RegionData = New BitstreamRegionData With {
+                .NumBits = MFMTrack.Bitstream.Length,
+                .Aligned = False
+            }
+
             _Bitstream = Nothing
             _SurfaceData = Nothing
+            RegionData.Track = TrackData.Track
+            RegionData.Side = TrackData.Side
+            LoadData(Data, RegionData, KeepGridLocation)
+        End If
+    End Sub
+
+    ''' <summary>
+    ''' Rebuilds the decoded hex view from the working-clone bitstream without cloning the live track.
+    ''' </summary>
+    Private Sub ReloadFromWorkingBitstream(Optional KeepGridLocation As Boolean = False)
+        If _Bitstream Is Nothing OrElse _CurrentTrackData Is Nothing Then
+            Exit Sub
         End If
 
-        RegionData.Track = TrackData.Track
-        RegionData.Side = TrackData.Side
+        Dim Data() As Byte
+        Dim RegionData As BitstreamRegionData
 
+        If _TrackType = BitstreamTrackType.MFM Or _TrackType = BitstreamTrackType.FM Then
+            Dim NumBytes = _Bitstream.Length \ 16
+            Dim Offset = _CurrentTrackData.Offset
+            RegionData = MFMGetRegionList(_Bitstream, _TrackType)
+            Data = MFMGetBytes(_Bitstream, Offset, RegionData.NumBytes)
+            _WeakBitRegions = GetWeakBitRegions(_Bitstream, Offset)
+
+            If _SurfaceData IsNot Nothing AndAlso _WeakBitRegions IsNot Nothing Then
+                For Each Range In _WeakBitRegions
+                    For Each Sector In RegionData.Sectors
+                        Dim SectorLength = Sector.Length
+                        If SectorLength = 0 Then
+                            SectorLength = NumBytes - Sector.StartIndex
+                        End If
+                        Dim SectorEnd As Integer = Sector.StartIndex + SectorLength - 1
+                        If Range.StartIndex <= SectorEnd AndAlso Range.EndIndex >= Sector.StartIndex Then
+                            Sector.HasWeakBits = True
+                        End If
+                    Next
+                Next
+            End If
+        Else
+            Data = BitsToBytes(_Bitstream, 0)
+            RegionData = New BitstreamRegionData With {
+                .NumBits = _Bitstream.Length,
+                .Aligned = False
+            }
+        End If
+
+        RegionData.Track = _Track
+        RegionData.Side = _Side
         LoadData(Data, RegionData, KeepGridLocation)
     End Sub
 
@@ -633,12 +841,11 @@ Public Class HexViewRawForm
         ComboTrack.Items.Clear()
         For i = 0 To _FloppyImage.TrackCount - 1
             For j = 0 To _FloppyImage.SideCount - 1
-                Dim TrackIndex = i * _FloppyImage.SideCount + j
-                If AllTracks OrElse (_FloppyImage.NonStandardTracks.Contains(TrackIndex) Or _FloppyImage.AdditionalTracks.Contains(TrackIndex)) Then
+                If IsTrackListed(i, j, AllTracks) Then
                     Dim TrackData As New TrackData With {
                         .Track = i,
                         .Side = j,
-                        .Offset = -1
+                        .Offset = GetCachedOffset(i, j)
                     }
                     ComboTrack.Items.Add(TrackData)
                     If i = _Track And j = _Side Then
@@ -654,18 +861,93 @@ Public Class HexViewRawForm
         ComboTrack.SelectedIndex = SelectedIndex
     End Sub
 
+    Private Function IsTrackListed(Track As UShort, Side As Byte, AllTracks As Boolean) As Boolean
+        If AllTracks Then
+            Return True
+        End If
+
+        Dim TrackIndex = Track * _FloppyImage.SideCount + Side
+        Return _FloppyImage.NonStandardTracks.Contains(TrackIndex) OrElse _FloppyImage.AdditionalTracks.Contains(TrackIndex)
+    End Function
+
+    Private Function CanFillSelection() As Boolean
+        If HexBox1.ByteProvider Is Nothing OrElse HexBox1.SelectionLength <= 0 Then
+            Return False
+        End If
+
+        Dim SelectionStart = HexBox1.SelectionStart
+        Dim SelectionEnd = SelectionStart + HexBox1.SelectionLength - 1
+        If SelectionStart < 0 OrElse SelectionEnd >= HexBox1.ByteProvider.Length Then
+            Return False
+        End If
+
+        If _RegionMap Is Nothing Then
+            Return False
+        End If
+
+        Dim RegionStart = _RegionMap(SelectionStart)
+        Dim RegionEnd = _RegionMap(SelectionEnd)
+        If RegionStart Is Nothing OrElse RegionStart IsNot RegionEnd Then
+            Return False
+        End If
+
+        Return GetEditableRegion(SelectionStart) IsNot Nothing
+    End Function
+
+    Private Sub PopulateFillValues()
+        BtnFill.DropDownItems.Clear()
+        For Counter = 0 To 15
+            Dim Item As New ToolStripMenuItem(Counter.ToString("X"))
+            BtnFill.DropDownItems.Add(Item)
+            For Counter2 = 0 To 15
+                Dim Value = Counter * 16 + Counter2
+                Dim Item2 As New ToolStripMenuItem("0x" & Value.ToString("X2"), Nothing, AddressOf BtnFill_Click) With {
+                    .Tag = Value
+                }
+                Item.DropDownItems.Add(Item2)
+            Next
+        Next
+    End Sub
+
     Private Sub ProcessKeyPress(e As KeyEventArgs)
         If e.Control And e.KeyCode = Keys.C Then
             If HexBox1.CanCopy Then
                 If e.Shift Then
-                    CopyHexFormatted(HexBox1)
+                    CopyHex(HexBox1, True)
                 Else
-                    CopyHexToClipboard()
+                    CopyHex(HexBox1, False)
                 End If
+            End If
+            e.SuppressKeyPress = True
+        ElseIf e.Control And e.KeyCode = Keys.V Then
+            If ClipboardHasHex() Then
+                PasteHex()
+            End If
+            e.SuppressKeyPress = True
+        ElseIf e.KeyCode = Keys.Delete Then
+            If CanFillSelection() Then
+                FillSelected(0)
             End If
             e.SuppressKeyPress = True
         End If
     End Sub
+    Private Sub RefreshBits(BitArray As BitArray, DataRow As DataRowEnum, CheckSync As Boolean)
+        If BitArray Is Nothing Then
+            _DataGridInspector.SetDataRow(DataRow, Nothing, True, True)
+        Else
+            Dim SelectionStart = HexBox1.SelectionStart
+            Dim SelectionLength = HexBox1.SelectionLength
+            Dim OutOfRange As Boolean = SelectionStart >= HexBox1.ByteProvider.Length
+
+            If SelectionStart > -1 And SelectionLength < 2 And Not OutOfRange Then
+                Dim Bits = GetBits(BitArray, SelectionStart, CheckSync)
+                _DataGridInspector.SetDataRow(DataRow, Bits, True, False)
+            Else
+                _DataGridInspector.SetDataRow(DataRow, Nothing, True, False)
+            End If
+        End If
+    End Sub
+
     Private Sub RefreshSelection(ForceUpdate As Boolean)
         If Not _Initialized And Not ForceUpdate Then
             Exit Sub
@@ -699,7 +981,7 @@ Public Class HexViewRawForm
             Dim OutOfRange As Boolean = SelectionStart >= HexBox1.ByteProvider.Length
 
             ToolStripStatusOffset.Visible = Not OutOfRange
-            ToolStripStatusOffset.Text = "Offset(h) :  " & OffsetStart.ToString("X")
+            ToolStripStatusOffset.Text = FormatLabelPair(My.Resources.Label_OffsetHex, OffsetStart.ToString("X"), " :  ")
 
             If SelectionLength = 0 Then
                 ToolStripStatusBlock.Visible = False
@@ -708,9 +990,9 @@ Public Class HexViewRawForm
                 ToolStripStatusLength.Text = ""
             Else
                 ToolStripStatusBlock.Visible = True
-                ToolStripStatusBlock.Text = "Block(h): " & OffsetStart.ToString("X") & "-" & OffsetEnd.ToString("X")
+                ToolStripStatusLength.Text = FormatLabelPair(My.Resources.Label_BlockHex, OffsetStart.ToString("X") & "-" & OffsetEnd.ToString("X"))
                 ToolStripStatusLength.Visible = True
-                ToolStripStatusLength.Text = "Length(h): " & SelectionLength.ToString("X") & "  (" & SelectionLength & ")"
+                ToolStripStatusLength.Text = FormatLabelPair(My.Resources.Label_LengthHex, SelectionLength.ToString("X") & "  " & InParens(SelectionLength))
             End If
 
             If Not OutOfRange Then
@@ -744,9 +1026,9 @@ Public Class HexViewRawForm
 
         If _CurrentRegionSector Is Nothing Then
             ToolStripStatusTrack.Visible = True
-            ToolStripStatusTrack.Text = "Track: " & _RegionData.Track
+            ToolStripStatusTrack.Text = FormatLabelPair(My.Resources.Label_Track, _RegionData.Track)
             ToolStripStatusSide.Visible = True
-            ToolStripStatusSide.Text = "Side: " & _RegionData.Side
+            ToolStripStatusSide.Text = FormatLabelPair(My.Resources.Label_Side, _RegionData.Side)
             ToolStripStatusTrackSector.Visible = False
             ToolStripStatusTrackSize.Visible = False
             ToolStripStatusChecksumText.Visible = False
@@ -755,20 +1037,20 @@ Public Class HexViewRawForm
             BtnSelectSector.Enabled = False
         Else
             ToolStripStatusTrack.Visible = True
-            ToolStripStatusTrack.Text = "Track: " & _CurrentRegionSector.Track
+            ToolStripStatusTrack.Text = FormatLabelPair(My.Resources.Label_Track, _CurrentRegionSector.Track)
             ToolStripStatusSide.Visible = True
-            ToolStripStatusSide.Text = "Side: " & _CurrentRegionSector.Side
+            ToolStripStatusSide.Text = FormatLabelPair(My.Resources.Label_Side, _CurrentRegionSector.Side)
             ToolStripStatusTrackSector.Visible = True
-            ToolStripStatusTrackSector.Text = "Sector Id: " & _CurrentRegionSector.SectorId
+            ToolStripStatusTrackSector.Text = FormatLabelPair(My.Resources.Label_SectorId, _CurrentRegionSector.SectorId)
             ToolStripStatusTrackSize.Visible = True
-            ToolStripStatusTrackSize.Text = "Size: " & _CurrentRegionSector.DataLength
+            ToolStripStatusTrackSize.Text = FormatLabelPair(My.Resources.Label_Size, _CurrentRegionSector.DataLength)
             ToolStripStatusChecksumText.Visible = True
             ToolStripStatusChecksum.Visible = True
             If _CurrentRegionSector.DataChecksumValid Then
-                ToolStripStatusChecksum.Text = "Valid"
+                ToolStripStatusChecksum.Text = My.Resources.Label_Valid
                 ToolStripStatusChecksum.ForeColor = Color.Green
             Else
-                ToolStripStatusChecksum.Text = "Invalid"
+                ToolStripStatusChecksum.Text = My.Resources.Label_Invalid
                 ToolStripStatusChecksum.ForeColor = Color.Red
             End If
             If RegionEnd IsNot Nothing Then
@@ -794,6 +1076,23 @@ Public Class HexViewRawForm
         BtnCopyHexFormatted.Enabled = HexBox1.CanCopy
         ToolStripBtnCopyHexFormatted.Enabled = BtnCopyHexFormatted.Enabled
 
+        BtnCopyEncoded.Enabled = HexBox1.CanCopy
+
+        Dim FillEnabled = CanFillSelection()
+        BtnDelete.Enabled = FillEnabled
+        ToolStripBtnDelete.Enabled = FillEnabled
+        BtnFill4E.Enabled = FillEnabled
+        ToolStripBtnFill4E.Enabled = FillEnabled
+        BtnFill.Enabled = FillEnabled
+
+        HexBox1.ReadOnly = (GetEditableRegion(HexBox1.SelectionStart) Is Nothing)
+
+        RefreshPasteButton()
+        RefreshGapMenuItems()
+        RefreshRemoveSpliceMenuItem()
+        RefreshRotateTrackMenuItem()
+        RefreshNormalizeTrackSizeMenuItem()
+
         RefreshBits(_Bitstream, DataRowEnum.Bitstream, True)
         RefreshBits(_SurfaceData, DataRowEnum.WeakBits, False)
 
@@ -817,26 +1116,14 @@ Public Class HexViewRawForm
 
         _IgnoreEvent = True
 
-        ComboSector.SelectedItem = RegionData.Sector
+        _TopSector = RegionData.Sector
+        If _RegionData Is Nothing OrElse _RegionData.Sectors Is Nothing OrElse _TopSector Is Nothing Then
+            PanelSectors.SelectedIndex = -1
+        Else
+            PanelSectors.SelectedIndex = _RegionData.Sectors.IndexOf(_TopSector)
+        End If
 
         _IgnoreEvent = False
-    End Sub
-
-    Private Sub RefreshBits(BitArray As BitArray, DataRow As DataRowEnum, CheckSync As Boolean)
-        If BitArray Is Nothing Then
-            _DataGridInspector.SetDataRow(DataRow, Nothing, True, True)
-        Else
-            Dim SelectionStart = HexBox1.SelectionStart
-            Dim SelectionLength = HexBox1.SelectionLength
-            Dim OutOfRange As Boolean = SelectionStart >= HexBox1.ByteProvider.Length
-
-            If SelectionStart > -1 And SelectionLength < 2 And Not OutOfRange Then
-                Dim Bits = GetBits(BitArray, SelectionStart, CheckSync)
-                _DataGridInspector.SetDataRow(DataRow, Bits, True, False)
-            Else
-                _DataGridInspector.SetDataRow(DataRow, Nothing, True, False)
-            End If
-        End If
     End Sub
 
     Private Sub Search(FindNext As Boolean)
@@ -850,11 +1137,9 @@ Public Class HexViewRawForm
         If FindNext And _LastSearch.SearchString <> "" Then
             Result = SearchNext(_LastSearch)
         Else
-            Dim frmHexSearchForm As New HexSearchForm(_LastSearch)
-            frmHexSearchForm.ShowDialog()
-
-            If frmHexSearchForm.DialogResult = DialogResult.OK Then
-                _LastSearch = frmHexSearchForm.Search
+            Dim Response = HexSearchForm.Display(_LastSearch)
+            If Response.Result Then
+                _LastSearch = Response.Search
                 Result = SearchNext(_LastSearch)
             End If
         End If
@@ -865,7 +1150,7 @@ Public Class HexViewRawForm
             HexBox1.PerformScrollToLine(TopLine)
             HexBox1.SelectionStart = SelectionStart
             HexBox1.SelectionLength = SelectionLength
-            MsgBox("Can't Find '" & _LastSearch.SearchString & "'", MsgBoxStyle.Information)
+            MsgBox(String.Format(My.Resources.Dialog_SearchNotFound, _LastSearch.SearchString), MsgBoxStyle.Information)
         Else
             RefreshSelection(False)
             DataInspectorRefresh(False)
@@ -910,7 +1195,7 @@ Public Class HexViewRawForm
     Private Sub SelectData()
         If _CurrentRegionSector IsNot Nothing Then
             Dim MaxLength = HexBox1.ByteProvider.Length
-            Dim DataLength = _CurrentRegionSector.DataLength
+            Dim DataLength = _CurrentRegionSector.AdjustedDataLength
             If _CurrentRegionSector.DataStartIndex + DataLength > MaxLength Then
                 DataLength = MaxLength - _CurrentRegionSector.DataStartIndex
             End If
@@ -937,6 +1222,116 @@ Public Class HexViewRawForm
         End If
     End Sub
 
+    Private Sub SelectTopSector(SectorIndex As Integer)
+        _TopSector = _RegionData.Sectors.Item(SectorIndex)
+        JumpToSector(_TopSector)
+        RefreshSelection(False)
+        DataInspectorRefresh(False)
+    End Sub
+
+    Private Function BuildSectorCells() As List(Of SelectablePanel.SectorCell)
+        Dim Cells As New List(Of SelectablePanel.SectorCell)
+
+        If _RegionData Is Nothing OrElse _RegionData.Sectors Is Nothing Then
+            Return Cells
+        End If
+
+        For Each Sector In _RegionData.Sectors
+            Dim FillColor As Color
+            If Not Sector.HasData Then
+                FillColor = Color.LightGray
+            ElseIf Not Sector.DataChecksumValid Or Not Sector.IDAMChecksumValid Then
+                FillColor = Color.LightPink
+            ElseIf IsStandardSector(Sector) Then
+                FillColor = Color.LightGreen
+            Else
+                FillColor = Color.LightBlue
+            End If
+
+            Cells.Add(New SelectablePanel.SectorCell With {
+                .Text = Sector.SectorId.ToString(),
+                .FillColor = FillColor,
+                .HasWeakBits = Sector.HasWeakBits,
+                .WriteSplice = Sector.WriteSplice,
+                .ToolTipText = GetSectorTooltip(Sector)
+            })
+        Next
+
+        Return Cells
+    End Function
+
+    Private Function GetSectorTooltip(Sector As BitstreamRegionSector) As String
+        Dim TooltipText = FormatLabelPair(My.Resources.Label_SectorId, vbTab & Sector.SectorId)
+        TooltipText &= Environment.NewLine & FormatLabelPair(My.Resources.Label_Size, vbTab & Sector.DataLength)
+
+        If Sector.Track <> _Track Then
+            TooltipText &= Environment.NewLine & FormatLabelPair(My.Resources.Label_Track, vbTab & Sector.Track)
+        End If
+
+        If Sector.Side <> _Side Then
+            TooltipText &= Environment.NewLine & FormatLabelPair(My.Resources.Label_Side, vbTab & Sector.Side)
+        End If
+
+        TooltipText &= Environment.NewLine & FormatLabelPair(My.Resources.Bitstream_AddressChecksum, vbTab & If(Sector.IDAMChecksumValid, My.Resources.Label_Valid, My.Resources.Label_Invalid))
+
+        If Sector.HasData Then
+            TooltipText &= Environment.NewLine & FormatLabelPair(My.Resources.Bitstream_DataChecksum, vbTab & If(Sector.DataChecksumValid, My.Resources.Label_Valid, My.Resources.Label_Invalid))
+        End If
+
+        Dim DAMText As String
+        If Not Sector.HasData Then
+            DAMText = My.Resources.Label_Missing
+        ElseIf Sector.DAM = MFMAddressMark.Data Then
+            DAMText = My.Resources.Label_Normal
+        ElseIf Sector.DAM = MFMAddressMark.DeletedData Then
+            DAMText = My.Resources.Label_Deleted
+        Else
+            DAMText = My.Resources.Label_Unknown
+        End If
+        TooltipText &= Environment.NewLine & FormatLabelPair(My.Resources.Bitstream_DAM, vbTab & DAMText)
+
+        If Sector.Overlaps Then
+            TooltipText &= Environment.NewLine & My.Resources.Bitstream_Overlaps
+        End If
+
+        If Sector.HasWeakBits Then
+            TooltipText &= Environment.NewLine & My.Resources.Label_WeakBits
+        End If
+
+        If Sector.WriteSplice Then
+            TooltipText &= Environment.NewLine & My.Resources.Bitstream_WriteSplice
+        End If
+
+        Return TooltipText
+    End Function
+
+    Private Function IsStandardSector(Sector As BitstreamRegionSector) As Boolean
+        If Sector.DataLength <> _FloppyImage.BytesPerSector Then
+            Return False
+        End If
+
+        If Sector.SectorId < 1 Or Sector.SectorId > _SectorsPerTrack Then
+            Return False
+        End If
+
+        If Sector.Track <> _Track Then
+            Return False
+        End If
+
+        If Sector.Side <> _Side Then
+            Return False
+        End If
+
+        If Sector.DAM <> MFMAddressMark.Data Then
+            Return False
+        End If
+
+        If Sector.Overlaps Then
+            Return False
+        End If
+
+        Return True
+    End Function
 #Region "Events"
 
     Private Sub BtnAdjustOffset_Click(sender As Object, e As EventArgs) Handles BtnAdjustOffset.Click, ToolStripBtnAdjustOffset.Click
@@ -952,21 +1347,27 @@ Public Class HexViewRawForm
         End If
     End Sub
 
+    Private Sub BtnCopyEncoded_Click(sender As Object, e As EventArgs) Handles BtnCopyEncoded.Click
+        If HexBox1.CanCopy Then
+            CopyHexEncoded(HexBox1, False)
+        End If
+    End Sub
+
     Private Sub BtnCopyHex_Click(sender As Object, e As EventArgs) Handles BtnCopyHex.Click, ToolStripBtnCopyHex.Click
         If HexBox1.CanCopy Then
-            CopyHexToClipboard()
+            CopyHex(HexBox1, False)
         End If
     End Sub
 
     Private Sub BtnCopyHexFormatted_Click(sender As Object, e As EventArgs) Handles BtnCopyHexFormatted.Click, ToolStripBtnCopyHexFormatted.Click
         If HexBox1.CanCopy Then
-            CopyHexFormatted(HexBox1)
+            CopyHex(HexBox1, True)
         End If
     End Sub
 
     Private Sub BtnCopyText_Click(sender As Object, e As EventArgs) Handles BtnCopyText.Click, ToolStripBtnCopyText.Click
         If HexBox1.CanCopy Then
-            CopyTextToClipboard()
+            HexBox1.Copy()
         End If
     End Sub
 
@@ -1003,21 +1404,24 @@ Public Class HexViewRawForm
             Exit Sub
         End If
 
-        PopulateTracks(CheckBoxAllTracks.Checked)
-    End Sub
+        Dim AllTracks = CheckBoxAllTracks.Checked
+        Dim TrackWouldChange = Not IsTrackListed(_Track, _Side, AllTracks)
 
-    Private Sub ComboSector_SelectedIndexChanged(sender As Object, e As EventArgs) Handles ComboSector.SelectedIndexChanged
-        If _IgnoreEvent Then
-            Exit Sub
+        _IgnoreEvent = True
+        PopulateTracks(AllTracks)
+        _IgnoreEvent = False
+
+        If TrackWouldChange AndAlso ComboTrack.SelectedItem IsNot Nothing Then
+            LoadTrack(ComboTrack.SelectedItem, False, False)
         End If
-
-        JumpToSector(ComboSector.SelectedItem)
-        RefreshSelection(False)
-        DataInspectorRefresh(False)
     End Sub
 
     Private Sub ComboTrack_SelectedIndexChanged(sender As Object, e As EventArgs) Handles ComboTrack.SelectedIndexChanged
         If _IgnoreEvent Then
+            Exit Sub
+        End If
+
+        If ComboTrack.SelectedItem Is Nothing Then
             Exit Sub
         End If
 
@@ -1026,37 +1430,39 @@ Public Class HexViewRawForm
 
     Private Sub DataGridDataInspector_CellBeginEdit(sender As Object, e As DataGridViewCellCancelEventArgs) Handles DataGridDataInspector.CellBeginEdit
         Dim Row = DataGridDataInspector.Rows(e.RowIndex)
-        Dim Invalid As Boolean = Row.Cells.Item("DataGridInvalid").Value
-        Dim Editable As Boolean = Row.Cells.Item("DataGridEditable").Value
-        Dim Length As Integer = Row.Cells.Item("DataGridLength").Value
+        Dim Editable As Boolean = Row.Cells.Item(HexViewDataGridInspector.COLUMN_EDITABLE).Value
 
         If Not Editable Then
             e.Cancel = True
             Exit Sub
         End If
 
-        _CachedSelectedLength = HexBox1.SelectionLength
-        HexBox1.SelectionLength = Length
-
-        _StoredCellValue = Row.Cells.Item("DataGridValue").Value
+        _StoredCellValue = Row.Cells.Item(HexViewDataGridInspector.COLUMN_VALUE).Value
     End Sub
 
     Private Sub DataGridDataInspector_CellEndEdit(sender As Object, e As DataGridViewCellEventArgs) Handles DataGridDataInspector.CellEndEdit
         Dim Row = DataGridDataInspector.Rows(e.RowIndex)
-        Dim CellValue As String = Row.Cells.Item("DataGridValue").Value
-        Dim DataType As DataRowEnum = Row.Cells.Item("DataGridType").Value
+        Dim CellValue As String = Row.Cells.Item(HexViewDataGridInspector.COLUMN_VALUE).Value
 
         If CellValue <> _StoredCellValue Then
             _CachedSelectedLength = -1
             'DataInspectorUpdateHexBox(CellValue, DataType)
-        Else
-            HexBox1.SelectionLength = _CachedSelectedLength
-            _CachedSelectedLength = -1
         End If
+    End Sub
+
+    Private Sub DataGridDataInspector_Enter(sender As Object, e As EventArgs) Handles DataGridDataInspector.Enter
+        ApplyInspectorByteHighlight()
+    End Sub
+
+    Private Sub DataGridDataInspector_Leave(sender As Object, e As EventArgs) Handles DataGridDataInspector.Leave
+        RestoreInspectorByteHighlight()
     End Sub
 
     Private Sub DataGridDataInspector_SelectionChanged(sender As Object, e As EventArgs) Handles DataGridDataInspector.SelectionChanged
         DataInspectorRefreshButtons()
+        If DataGridDataInspector.ContainsFocus Then
+            ApplyInspectorByteHighlight()
+        End If
     End Sub
 
     Private Sub HexBox1_KeyDown(sender As Object, e As KeyEventArgs) Handles HexBox1.KeyDown
@@ -1066,7 +1472,7 @@ Public Class HexViewRawForm
     Private Sub HexBox1_MouseDown(sender As Object, e As MouseEventArgs) Handles HexBox1.MouseDown
         If e.Button = MouseButtons.Right Then
             If HexBox1.SelectionLength < 2 Then
-                HexBox1.SetCaretPosition(New Point(e.X, e.Y))
+                HexBox1.SetCaretPosition(New Drawing.Point(e.X, e.Y))
             End If
         End If
     End Sub
@@ -1109,12 +1515,30 @@ Public Class HexViewRawForm
         ChangeOffset(NumericBitOffset.Value)
     End Sub
 
+    Private Sub PanelSectors_SelectedIndexChanged(sender As Object, Index As Integer) Handles PanelSectors.SelectedIndexChanged
+        If _IgnoreEvent Then
+            Exit Sub
+        End If
+
+        If _RegionData Is Nothing OrElse _RegionData.Sectors Is Nothing Then
+            Exit Sub
+        End If
+
+        If Index > -1 AndAlso Index < _RegionData.Sectors.Count Then
+            SelectTopSector(Index)
+        End If
+    End Sub
+
     Private Sub ToolStripMain_ItemClicked(sender As Object, e As ToolStripItemClickedEventArgs) Handles ToolStripMain.ItemClicked
         HexBox1.Focus()
     End Sub
 
+    Private Sub HexViewRawForm_Shown(sender As Object, e As EventArgs) Handles Me.Shown
+        Me.ActiveControl = HexBox1
+    End Sub
 #End Region
 
+#Region "Helpers"
     Private Class HighlightRange
         Public Sub New(StartIndex As UInteger)
             _StartIndex = StartIndex
@@ -1133,4 +1557,19 @@ Public Class HexViewRawForm
             Return Track & "." & Side
         End Function
     End Class
+
+    Private Class FlatToolStripRenderer
+        Inherits ToolStripProfessionalRenderer
+
+        Protected Overrides Sub OnRenderToolStripBackground(e As ToolStripRenderEventArgs)
+            e.Graphics.Clear(e.ToolStrip.BackColor)
+        End Sub
+
+        Protected Overrides Sub OnRenderToolStripBorder(e As ToolStripRenderEventArgs)
+            ' Do not draw the ToolStrip border
+        End Sub
+    End Class
+
+#End Region
+
 End Class

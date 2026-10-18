@@ -7,6 +7,8 @@ Public Class HexSearchForm
         InitializeComponent()
 
         ' Add any initialization after the InitializeComponent() call.
+        LocalizeForm()
+
         If HexSearch.SearchHex Then
             RadBtnHex.Checked = True
             ChkCaseSensitive.Enabled = False
@@ -20,12 +22,30 @@ Public Class HexSearchForm
         BtnOK.Enabled = TextSearch.Text.Length > 0
     End Sub
 
+    Private Sub LocalizeForm()
+        BtnCancel.Text = My.Resources.Menu_Cancel
+        BtnOK.Text = My.Resources.Menu_Ok
+        ChkCaseSensitive.Text = My.Resources.Label_CaseSensitive
+        Label1.Text = My.Resources.Label_SearchFor
+        Me.Text = My.Resources.Label_Find
+        RadBtnHex.Text = My.Resources.Label_Hex
+        RadBtnText.Text = My.Resources.Label_Text
+    End Sub
+
     Public Function Search() As HexSearch
         Return New HexSearch With {
             .SearchHex = RadBtnHex.Checked,
             .SearchString = TextSearch.Text.Trim,
             .CaseSensitive = ChkCaseSensitive.Checked
         }
+    End Function
+
+    Public Shared Function Display(HexSearch As HexSearch) As (Result As Boolean, Search As HexSearch)
+        Using dlg As New HexSearchForm(HexSearch)
+            dlg.ShowDialog(App.CurrentFormInstance)
+
+            Return (dlg.DialogResult = DialogResult.OK, dlg.Search)
+        End Using
     End Function
 
     Private Function CheckHex() As Boolean
@@ -46,7 +66,7 @@ Public Class HexSearchForm
         If Me.DialogResult = DialogResult.OK Then
             If RadBtnHex.Checked Then
                 If Not CheckHex() Then
-                    MsgBox("Invalid Search String", MsgBoxStyle.Exclamation)
+                    MsgBox(My.Resources.Dialog_InvalidSearchString, MsgBoxStyle.Exclamation)
                     e.Cancel = True
                 End If
             End If

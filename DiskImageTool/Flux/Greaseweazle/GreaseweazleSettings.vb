@@ -1,0 +1,243 @@
+﻿Imports CompactJson
+Imports DiskImageTool.DiskImage.FloppyDiskFunctions
+
+Namespace Flux.Greaseweazle
+    Public Class GreaseweazleSettings
+        Inherits Settings.SettingsGroup
+        Implements ISettings
+
+        Public Const MAX_TRACKS As Byte = 84
+        Public Const MAX_TRACKS_525DD As Byte = 42
+        Public Const MIN_TRACKS As Byte = 80
+        Public Const MIN_TRACKS_525DD As Byte = 40
+
+        Private Const DEFAULT_LOG_FILE_NAME As String = "log.txt"
+        Private Const MaxDrives As Integer = 3
+
+        Private _comPort As String = ""
+        Private _defaultRevs As Integer = 3
+        Private _Drives As New List(Of DriveSettings) From {
+                        New DriveSettings(),
+                        New DriveSettings(),
+                        New DriveSettings()
+                    }
+
+        Private _interface As GreaseweazleInterface = GreaseweazleInterface.IBM
+        Private _logFileName As String = DEFAULT_LOG_FILE_NAME
+
+        Public Enum GreaseweazleInterface
+            IBM
+            Shugart
+        End Enum
+
+        Public Property [Interface] As GreaseweazleInterface
+            Get
+                Return _interface
+            End Get
+            Set(value As GreaseweazleInterface)
+                If _interface <> value Then
+                    _interface = value
+                    MarkDirty()
+                End If
+            End Set
+        End Property
+
+        Public Property AppPath As String Implements ISettings.AppPath
+            Get
+                Throw New NotImplementedException()
+            End Get
+            Set(value As String)
+                Throw New NotImplementedException()
+            End Set
+        End Property
+
+        Public ReadOnly Property AvailableDriveTypes As FloppyDriveType
+            Get
+                Dim AvailableTypes As FloppyDriveType = Drives(0).Type Or Drives(1).Type
+                If [Interface] = GreaseweazleInterface.Shugart Then
+                    AvailableTypes = AvailableTypes Or Drives(2).Type
+                End If
+
+                Return AvailableTypes
+            End Get
+        End Property
+
+        Public Property ComPort As String
+            Get
+                Return _comPort
+            End Get
+            Set(value As String)
+                If _comPort <> value Then
+                    _comPort = value
+                    MarkDirty()
+                End If
+            End Set
+        End Property
+
+        Public Property DefaultRevs As Integer
+            Get
+                Dim value As UShort = _defaultRevs
+                If value < MIN_REVS Then
+                    value = MIN_REVS
+                ElseIf value > MAX_REVS Then
+                    value = MAX_REVS
+                End If
+
+                Return value
+            End Get
+            Set(value As Integer)
+                If value < MIN_REVS Then
+                    value = MIN_REVS
+                ElseIf value > MAX_REVS Then
+                    value = MAX_REVS
+                End If
+
+                If _defaultRevs <> value Then
+                    _defaultRevs = value
+                    MarkDirty()
+                End If
+            End Set
+        End Property
+
+        Public Property Drives As List(Of DriveSettings)
+            Get
+                Return _Drives
+            End Get
+            Set
+                _Drives = Value
+            End Set
+        End Property
+
+        Public Overrides ReadOnly Property IsDirty As Boolean
+            Get
+                If MyBase.IsDirty Then Return True
+
+                If Drives IsNot Nothing Then
+                    For Each d In Drives
+                        If d IsNot Nothing AndAlso d.IsDirty Then
+                            Return True
+                        End If
+                    Next
+                End If
+
+                Return False
+            End Get
+        End Property
+
+        Public Property LogFileName As String Implements Flux.ISettings.LogFileName
+            Get
+                Return If(String.IsNullOrEmpty(_logFileName), DEFAULT_LOG_FILE_NAME, _logFileName)
+            End Get
+            Set(value As String)
+                If _logFileName <> value Then
+                    _logFileName = value
+                    MarkDirty()
+                End If
+            End Set
+        End Property
+
+        Public Property LogStripPath As Boolean Implements ISettings.LogStripPath
+            Get
+                Return False
+            End Get
+            Set(value As Boolean)
+                ' Not supported
+            End Set
+        End Property
+
+        Public Function IsPathValid() As Boolean Implements ISettings.IsPathValid
+            Return True
+        End Function
+
+        Public Sub LoadFromDictionary(dict As Dictionary(Of String, JsonValue))
+            If dict Is Nothing Then
+                MarkClean()
+                Return
+            End If
+
+            _interface = GetInterfaceFromName(ReadValue(dict, "interface", GetInterfaceName(_interface)))
+            _comPort = ReadValue(dict, "comPort", _comPort)
+            _defaultRevs = ReadValue(dict, "defaultRevs", _defaultRevs)
+            _logFileName = ReadValue(dict, "logFileName", _logFileName)
+
+            LoadDriveList(dict)
+
+            MarkClean()
+        End Sub
+
+        Public Overrides Sub MarkClean()
+            MyBase.MarkClean()
+
+            If Drives IsNot Nothing Then
+                For Each d In Drives
+                    d?.MarkClean()
+                Next
+            End If
+        End Sub
+        Public Function ToJsonObject() As Dictionary(Of String, Object)
+            Dim driveArray As New List(Of Object)
+            If Drives IsNot Nothing Then
+                For Each d In Drives
+                    driveArray.Add(d.ToJsonObject())
+                Next
+            End If
+
+            Return New Dictionary(Of String, Object) From {
+                {"interface", GetInterfaceName(_interface)},
+                {"drives", driveArray},
+                {"comPort", _comPort},
+                {"defaultRevs", _defaultRevs},
+                {"logFileName", _logFileName}
+            }
+        End Function
+
+        Private Shared Function GetInterfaceFromName(Value As String) As GreaseweazleInterface
+            Select Case Value
+                Case "Shugart"
+                    Return GreaseweazleInterface.Shugart
+                Case Else
+                    Return GreaseweazleInterface.IBM
+            End Select
+        End Function
+
+        Private Shared Function GetInterfaceName(Value As GreaseweazleInterface) As String
+            Select Case Value
+                Case GreaseweazleInterface.Shugart
+                    Return "Shugart"
+                Case Else
+                    Return "IBM"
+            End Select
+        End Function
+
+        Private Sub LoadDriveList(parent As Dictionary(Of String, JsonValue))
+
+            Dim drivesValue As JsonValue = Nothing
+            If Not parent.TryGetValue("drives", drivesValue) OrElse drivesValue Is Nothing Then
+                Return
+            End If
+
+            Try
+                ' Parse into list of dictionaries
+                Dim arr = Serializer.Parse(Of List(Of Dictionary(Of String, JsonValue)))(drivesValue.ToString())
+
+                Dim newList As New List(Of DriveSettings)(MaxDrives)
+
+                For i = 0 To MaxDrives - 1
+                    Dim d As New DriveSettings
+                    If i < arr.Count Then
+                        d.LoadFromDictionary(arr(i))
+                    End If
+
+                    newList.Add(d)
+
+                Next
+
+                _Drives = newList
+
+            Catch
+                ' Fail silently, keep existing list
+            End Try
+        End Sub
+    End Class
+
+End Namespace

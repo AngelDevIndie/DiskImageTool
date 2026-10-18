@@ -25,9 +25,10 @@
             End Get
         End Property
 
-        Public Overrides Function AddDirectory(DirectoryData() As Byte, Options As AddFileOptions, LFNFileName As String, Optional Index As Integer = -1) As AddDirectoryData Implements IDirectory.AddDirectory
+        Public Overrides Function AddDirectory(EntryData() As Byte, Options As AddFileOptions, Filename As String, Optional Index As Integer = -1) As AddFileData Implements IDirectory.AddDirectory
             Dim Result As Boolean = True
-            Dim Data = InitializeAddDirectory(Me, Options, LFNFileName, Index)
+
+            Dim Data = InitializeAddDirectory(Me, Options, Index, Filename)
 
             If Data.ClusterList Is Nothing Then
                 Result = False
@@ -50,7 +51,7 @@
                         ExpandDirectorySize(Cluster)
                     End If
 
-                    Data.Entry = ProcessAddDirectory(Me, DirectoryData, Data)
+                    ProcessAddDirectory(Me, Data, EntryData)
 
                     If UseTransaction Then
                         Disk.EndTransaction()
@@ -66,12 +67,11 @@
         End Function
 
         Public Overrides Function AddFile(FileInfo As IO.FileInfo, Options As AddFileOptions, Optional Index As Integer = -1) As Integer Implements IDirectory.AddFile
-
             If FileInfo.Length > Disk.Image.Length Then
                 Return -1
             End If
 
-            Dim Data = InitializeAddFile(Me, FileInfo, Options, Index)
+            Dim Data = InitializeAddFile(Me, Options, Index, FileInfo)
 
             If Data.ClusterList Is Nothing Then
                 Return -1
@@ -137,7 +137,7 @@
 
             For Index As UInteger = 0 To EntryCount - 1
                 Dim Offset = ClusterOffset + (Index * DirectoryEntry.DIRECTORY_ENTRY_SIZE)
-                Dim NewDirectoryEntry = New DirectoryEntry(_RootDirectory, Me, Offset, DirectoryEntries.Count, True)
+                Dim NewDirectoryEntry As New DirectoryEntry(_RootDirectory, Me, Offset, DirectoryEntries.Count, True)
                 DirectoryEntries.Add(NewDirectoryEntry)
             Next
 
@@ -149,7 +149,7 @@
         End Sub
 
         Public Overrides Function GetContent() As Byte() Implements IDirectory.GetContent
-            Return GetDataFromChain(Disk.Image, SectorChain)
+            Return GetDataFromChain(Disk.Image, Disk.BPB, SectorChain)
         End Function
 
         Public Sub Initialize()
